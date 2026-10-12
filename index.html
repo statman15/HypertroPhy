@@ -44,7 +44,7 @@
   * { box-sizing: border-box; }
   html { background: var(--bg); }
   body { margin: 0; min-height: 100dvh; font-size: 17px; line-height: 1.3; color: var(--label); background: var(--bg);
-    padding-bottom: max(16px, env(safe-area-inset-bottom)); -webkit-tap-highlight-color: transparent; }
+    padding-bottom: calc(150px + env(safe-area-inset-bottom)); -webkit-tap-highlight-color: transparent; }
   button, input, select { font: inherit; color: inherit; }
   button { cursor: pointer; background: none; border: 0; padding: 0; touch-action: manipulation; text-align: left; }
   :focus-visible { outline: 2px solid var(--tint); outline-offset: 2px; }
@@ -111,6 +111,92 @@
   .steps { margin: 0; padding-left: 22px; font-size: 15px; line-height: 1.45; }
   .steps li + li { margin-top: 8px; }
 
+  .glass { background: color-mix(in srgb, var(--group) 72%, transparent); -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%); }
+  @media (prefers-reduced-transparency: reduce) { .glass { background: var(--group); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+
+  /* Tab bar: Bookshelf's floating capsule. --dock-gap is its calibration knob above the home indicator. */
+  :root { --dock-gap: 12px; }
+  .dock { position: fixed; z-index: 3; left: 12px; right: 12px; bottom: max(10px, calc(env(safe-area-inset-bottom) - var(--dock-gap))); max-width: 560px; margin: 0 auto; }
+  .tabs { display: flex; height: 64px; padding: 4px; border-radius: 999px; box-shadow: 0 10px 30px var(--lift), inset 0 0 0 .5px var(--sep); }
+  .tabs button { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    border-radius: 999px; font-size: 11px; font-weight: 600; text-align: center; color: var(--label2); transition: background-color .2s, color .2s; }
+  .tabs button .ic { width: 25px; height: 25px; }
+  .tabs button[aria-selected=true] { color: var(--tint); background: var(--fill); }
+
+  /* Rest timer floats just above the tab bar. */
+  .restbar { position: fixed; z-index: 3; left: 12px; right: 12px; bottom: calc(max(10px, calc(env(safe-area-inset-bottom) - var(--dock-gap))) + 72px); max-width: 560px; margin: 0 auto;
+    display: flex; align-items: center; gap: 4px; height: 52px; padding: 0 6px; border-radius: 999px; box-shadow: 0 10px 30px var(--lift), inset 0 0 0 .5px var(--sep); }
+  .restbar span { flex: 1; text-align: center; font-variant-numeric: tabular-nums; }
+  .restbar b { font-size: 20px; color: var(--tint); }
+  .restbar button { min-width: 52px; height: 40px; padding: 0 12px; border-radius: 999px; font-weight: 600; text-align: center; background: var(--fill); }
+  .restbar .skip { color: var(--tint); }
+
+  .pad { padding: 12px 16px; }
+  .muted { color: var(--label2); font-size: 15px; }
+  .wide { width: 100%; }
+  .text-btn { min-height: 44px; padding: 0 4px; font-weight: 600; color: var(--tint); }
+  .text-btn:disabled { color: var(--label2); }
+  .row-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .row-head .count { margin: 0; }
+  .pickbar { display: flex; align-items: center; justify-content: space-between; margin: -8px 0 4px; color: var(--tint); }
+  .sec { display: flex; align-items: center; justify-content: space-between; margin: 24px 0 8px; }
+  .sec h2 { margin: 0; font-size: 22px; }
+  .card { margin-bottom: 12px; padding: 12px 16px 16px; }
+  .card-top { display: flex; align-items: center; justify-content: space-between; }
+  .card .a { margin: 0 0 12px; color: var(--label2); font-size: 15px; }
+  .label { margin: 16px 0 8px; font-size: 13px; font-weight: 400; text-transform: uppercase; color: var(--label2); }
+  .seg { display: flex; gap: 2px; padding: 2px; border-radius: 10px; background: var(--fill); }
+  .seg button { flex: 1; min-height: 34px; border-radius: 8px; font-size: 15px; font-weight: 500; text-align: center; }
+  .seg button[aria-checked=true] { font-weight: 600; background: var(--group); box-shadow: 0 2px 6px rgba(0, 0, 0, .12); }
+  .remove { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 50px; margin-top: 12px; border-radius: 12px; color: var(--danger); background: var(--fill); }
+
+  /* One exercise in the logger or routine editor. Supersets share a tinted rail on the left. */
+  .ex { margin-bottom: 12px; padding: 4px 0 8px; }
+  .ex.ss { padding-left: 12px; box-shadow: inset 3px 0 0 var(--tint); }
+  .ex-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .ex-name { font-size: 17px; font-weight: 700; color: var(--tint); }
+  .iconbtn { display: grid; place-items: center; width: 44px; height: 44px; margin-right: -10px; border-radius: 50%; color: var(--label2); }
+  .ex-sub { display: flex; align-items: center; gap: 12px; font-size: 15px; color: var(--label2); }
+  .mini select { height: 32px; padding: 0 8px; border: 0; border-radius: 8px; background: var(--fill); color: var(--tint); font-size: 14px; font-weight: 600; -webkit-appearance: none; appearance: none; }
+  .sets { width: 100%; margin-top: 6px; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .sets th { padding: 4px 2px; font-size: 12px; font-weight: 600; color: var(--label2); text-align: center; }
+  .sets td { padding: 3px 2px; text-align: center; }
+  .sets td:first-child { width: 36px; font-weight: 600; }
+  .sets .prev { font-size: 14px; color: var(--label2); white-space: nowrap; }
+  .sets input { width: 100%; max-width: 76px; height: 36px; border: 0; border-radius: 8px; background: var(--fill); text-align: center; font-size: 17px; font-weight: 600; -webkit-appearance: none; }
+  .sets input::placeholder { color: var(--label2); font-weight: 400; }
+  .sets td:last-child { width: 48px; }
+  .check { display: grid; place-items: center; width: 40px; height: 36px; margin: auto; border-radius: 8px; color: var(--label2); background: var(--fill); }
+  .check .ic { width: 18px; height: 18px; }
+  .sets tr.done td { background: color-mix(in srgb, var(--tint) 14%, transparent); }
+  .sets tr.done .check { color: var(--on-tint); background: var(--tint); }
+  .link { display: flex; align-items: center; gap: 6px; margin: -4px 0 12px; min-height: 36px; font-size: 14px; font-weight: 600; color: var(--label2); }
+  .link .ic { width: 18px; height: 18px; }
+  .link.on { color: var(--tint); }
+  .fields { display: grid; grid-template-columns: 70px 1fr auto; gap: 10px; margin-top: 6px; }
+  .fields label { display: grid; gap: 4px; font-size: 12px; font-weight: 600; color: var(--label2); }
+  .fields input, .fields select { width: 100%; height: 36px; border: 0; border-radius: 8px; background: var(--fill); text-align: center; font-size: 17px; -webkit-appearance: none; appearance: none; }
+  .fields select { padding: 0 10px; font-size: 15px; }
+  .range { display: flex; align-items: center; gap: 4px; color: var(--label); }
+  .title-input { width: 100%; height: 48px; margin-bottom: 12px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--fill); font-size: 22px; font-weight: 700; }
+
+  .hrow { display: grid; gap: 2px; width: 100%; padding: 12px 0; box-shadow: inset 0 -.5px 0 var(--sep); }
+  .hrow .t { font-weight: 600; }
+  .hrow .a { overflow: hidden; font-size: 15px; color: var(--label2); white-space: nowrap; text-overflow: ellipsis; }
+  .pr { display: inline-flex; align-items: center; gap: 3px; color: var(--tint); font-weight: 600; }
+  .pr .ic { width: 15px; height: 15px; }
+  .setlist { margin: 0; padding: 4px 16px; list-style: none; counter-reset: s; font-variant-numeric: tabular-nums; }
+  .setlist li { display: flex; justify-content: space-between; padding: 8px 0; counter-increment: s; }
+  .setlist li::before { content: counter(s); width: 28px; font-weight: 600; color: var(--label2); }
+  .setlist li span:first-of-type { flex: 1; }
+  .setlist li + li { box-shadow: inset 0 .5px 0 var(--sep); }
+  .menu-list { margin-top: 8px; }
+  .menu-list.gap { margin-top: 24px; }
+  .menu-list button { display: block; width: 100%; min-height: 50px; padding: 0 16px; font-weight: 500; }
+  .menu-list button + button { box-shadow: inset 0 .5px 0 var(--sep); }
+  .menu-list button:active { background: var(--fill); }
+  .menu-list .danger { color: var(--danger); }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
     /* No blinking: show the two positions side by side. */
@@ -122,31 +208,61 @@
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <!-- Phosphor Icons 2.1.1 (MIT) -->
-  <symbol id="search" viewBox="0 0 256 256"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></symbol>
-  <symbol id="x" viewBox="0 0 256 256"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 256 256"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></symbol>
+  <symbol id="i-x" viewBox="0 0 256 256"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 256 256"><path d="M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L96,183,215.51,63.51a12,12,0,0,1,17,17Z"/></symbol>
+  <symbol id="i-dots" viewBox="0 0 256 256"><path d="M140,128a12,12,0,1,1-12-12A12,12,0,0,1,140,128Zm56-12a12,12,0,1,0,12,12A12,12,0,0,0,196,116ZM60,116a12,12,0,1,0,12,12A12,12,0,0,0,60,116Z"/></symbol>
+  <symbol id="i-link" viewBox="0 0 256 256"><path d="M240,88.23a54.43,54.43,0,0,1-16,37L189.25,160a54.27,54.27,0,0,1-38.63,16h-.05A54.63,54.63,0,0,1,96,119.84a8,8,0,0,1,16,.45A38.62,38.62,0,0,0,150.58,160h0a38.39,38.39,0,0,0,27.31-11.31l34.75-34.75a38.63,38.63,0,0,0-54.63-54.63l-11,11A8,8,0,0,1,135.7,59l11-11A54.65,54.65,0,0,1,224,48,54.86,54.86,0,0,1,240,88.23ZM109,185.66l-11,11A38.41,38.41,0,0,1,70.6,208h0a38.63,38.63,0,0,1-27.29-65.94L78,107.31A38.63,38.63,0,0,1,144,135.71a8,8,0,0,0,16,.45A54.86,54.86,0,0,0,144,96a54.65,54.65,0,0,0-77.27,0L32,130.75A54.62,54.62,0,0,0,70.56,224h0a54.28,54.28,0,0,0,38.64-16l11-11A8,8,0,0,0,109,185.66Z"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 256 256"><path d="M232,64H208V48a8,8,0,0,0-8-8H56a8,8,0,0,0-8,8V64H24A16,16,0,0,0,8,80V96a40,40,0,0,0,40,40h3.65A80.13,80.13,0,0,0,120,191.61V216H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16H136V191.58c31.94-3.23,58.44-25.64,68.08-55.58H208a40,40,0,0,0,40-40V80A16,16,0,0,0,232,64ZM48,120A24,24,0,0,1,24,96V80H48v32q0,4,.39,8Zm144-8.9c0,35.52-29,64.64-64,64.9a64,64,0,0,1-64-64V56H192ZM232,96a24,24,0,0,1-24,24h-.5a81.81,81.81,0,0,0,.5-8.9V80h24Z"/></symbol>
+  <symbol id="i-barbell" viewBox="0 0 256 256"><path d="M248,120h-8V88a16,16,0,0,0-16-16H208V64a16,16,0,0,0-16-16H168a16,16,0,0,0-16,16v56H104V64A16,16,0,0,0,88,48H64A16,16,0,0,0,48,64v8H32A16,16,0,0,0,16,88v32H8a8,8,0,0,0,0,16h8v32a16,16,0,0,0,16,16H48v8a16,16,0,0,0,16,16H88a16,16,0,0,0,16-16V136h48v56a16,16,0,0,0,16,16h24a16,16,0,0,0,16-16v-8h16a16,16,0,0,0,16-16V136h8a8,8,0,0,0,0-16ZM32,168V88H48v80Zm56,24H64V64H88V192Zm104,0H168V64h24V175.82c0,.06,0,.12,0,.18s0,.12,0,.18V192Zm32-24H208V88h16Z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 256 256"><path d="M136,80v43.47l36.12,21.67a8,8,0,0,1-8.24,13.72l-40-24A8,8,0,0,1,120,128V80a8,8,0,0,1,16,0Zm-8-48A95.44,95.44,0,0,0,60.08,60.15C52.81,67.51,46.35,74.59,40,82V64a8,8,0,0,0-16,0v40a8,8,0,0,0,8,8H72a8,8,0,0,0,0-16H49c7.15-8.42,14.27-16.35,22.39-24.57a80,80,0,1,1,1.66,114.75,8,8,0,1,0-11,11.64A96,96,0,1,0,128,32Z"/></symbol>
+  <symbol id="i-list" viewBox="0 0 256 256"><path d="M32,64a8,8,0,0,1,8-8H216a8,8,0,0,1,0,16H40A8,8,0,0,1,32,64Zm8,72h72a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16Zm88,48H40a8,8,0,0,0,0,16h88a8,8,0,0,0,0-16Zm109.66,13.66a8,8,0,0,1-11.32,0L206,177.36A40,40,0,1,1,217.36,166l20.3,20.3A8,8,0,0,1,237.66,197.66ZM184,168a24,24,0,1,0-24-24A24,24,0,0,0,184,168Z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 256 256"><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm109.94-52.79a8,8,0,0,0-3.89-5.4l-29.83-17-.12-33.62a8,8,0,0,0-2.83-6.08,111.91,111.91,0,0,0-36.72-20.67,8,8,0,0,0-6.46.59L128,41.85,97.88,25a8,8,0,0,0-6.47-.6A112.1,112.1,0,0,0,54.73,45.15a8,8,0,0,0-2.83,6.07l-.15,33.65-29.83,17a8,8,0,0,0-3.89,5.4,106.47,106.47,0,0,0,0,41.56,8,8,0,0,0,3.89,5.4l29.83,17,.12,33.62a8,8,0,0,0,2.83,6.08,111.91,111.91,0,0,0,36.72,20.67,8,8,0,0,0,6.46-.59L128,214.15,158.12,231a7.91,7.91,0,0,0,3.9,1,8.09,8.09,0,0,0,2.57-.42,112.1,112.1,0,0,0,36.68-20.73,8,8,0,0,0,2.83-6.07l.15-33.65,29.83-17a8,8,0,0,0,3.89-5.4A106.47,106.47,0,0,0,237.94,107.21Zm-15,34.91-28.57,16.25a8,8,0,0,0-3,3c-.58,1-1.19,2.06-1.81,3.06a7.94,7.94,0,0,0-1.22,4.21l-.15,32.25a95.89,95.89,0,0,1-25.37,14.3L134,199.13a8,8,0,0,0-3.91-1h-.19c-1.21,0-2.43,0-3.64,0a8.08,8.08,0,0,0-4.1,1l-28.84,16.1A96,96,0,0,1,67.88,201l-.11-32.2a8,8,0,0,0-1.22-4.22c-.62-1-1.23-2-1.8-3.06a8.09,8.09,0,0,0-3-3.06l-28.6-16.29a90.49,90.49,0,0,1,0-28.26L61.67,97.63a8,8,0,0,0,3-3c.58-1,1.19-2.06,1.81-3.06a7.94,7.94,0,0,0,1.22-4.21l.15-32.25a95.89,95.89,0,0,1,25.37-14.3L122,56.87a8,8,0,0,0,4.1,1c1.21,0,2.43,0,3.64,0a8.08,8.08,0,0,0,4.1-1l28.84-16.1A96,96,0,0,1,188.12,55l.11,32.2a8,8,0,0,0,1.22,4.22c.62,1,1.23,2,1.8,3.06a8.09,8.09,0,0,0,3,3.06l28.6,16.29A90.49,90.49,0,0,1,222.9,142.12Z"/></symbol>
 </svg>
 
 <main>
-  <div class="head">
-    <h1>Exercises</h1>
-    <p id="count" class="count"></p>
-    <label class="search"><svg class="ic" aria-hidden="true"><use href="#search"/></svg><span class="visually-hidden">Search exercises</span>
-      <input type="search" id="q" placeholder="Search" autocomplete="off"></label>
-    <div class="filters">
-      <label class="chip"><span class="visually-hidden">Muscle</span><select id="muscle"><option value="">All Muscles</option></select></label>
-      <label class="chip"><span class="visually-hidden">Equipment</span><select id="equip"><option value="">All Equipment</option></select></label>
+  <section data-tab="workout" id="workout"></section>
+  <section data-tab="history" id="history" hidden></section>
+  <section data-tab="exercises" hidden>
+    <div class="head">
+      <div id="pickBar" class="pickbar" hidden><b>Choose an exercise</b><button id="pickCancel" class="text-btn">Cancel</button></div>
+      <h1>Exercises</h1>
+      <p id="count" class="count"></p>
+      <label class="search"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><span class="visually-hidden">Search exercises</span>
+        <input type="search" id="q" placeholder="Search" autocomplete="off"></label>
+      <div class="filters">
+        <label class="chip"><span class="visually-hidden">Muscle</span><select id="muscle"><option value="">All Muscles</option></select></label>
+        <label class="chip"><span class="visually-hidden">Equipment</span><select id="equip"><option value="">All Equipment</option></select></label>
+      </div>
     </div>
-  </div>
-  <ul id="list" class="list"></ul>
-  <div id="empty" class="empty" hidden>
-    <h2>No Matches</h2>
-    <p>Try a different name, or clear the filters.</p>
-    <button id="clear" class="pill">Clear Filters</button>
-  </div>
+    <ul id="list" class="list"></ul>
+    <div id="empty" class="empty" hidden>
+      <h2>No Matches</h2>
+      <p>Try a different name, or clear the filters.</p>
+      <button id="clear" class="pill">Clear Filters</button>
+    </div>
+  </section>
+  <section data-tab="settings" id="settings" hidden></section>
 </main>
 
+<div id="rest" class="restbar glass" role="timer" aria-live="off" hidden>
+  <button data-adj="-15" aria-label="15 seconds less">−15</button>
+  <span>Rest <b id="restLeft"></b></span>
+  <button data-adj="15" aria-label="15 seconds more">+15</button>
+  <button class="skip">Skip</button>
+</div>
+
+<nav class="dock">
+  <div id="tabs" class="tabs glass" role="tablist" aria-label="Sections">
+    <button role="tab" data-go="workout" aria-selected="true"><svg class="ic" aria-hidden="true"><use href="#i-barbell"/></svg>Workout</button>
+    <button role="tab" data-go="history" aria-selected="false"><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg>History</button>
+    <button role="tab" data-go="exercises" aria-selected="false"><svg class="ic" aria-hidden="true"><use href="#i-list"/></svg>Exercises</button>
+    <button role="tab" data-go="settings" aria-selected="false"><svg class="ic" aria-hidden="true"><use href="#i-gear"/></svg>Settings</button>
+  </div>
+</nav>
+
 <dialog id="sheet" class="sheet" aria-labelledby="sheetTitle">
-  <button class="close" data-done aria-label="Close"><svg class="ic" aria-hidden="true"><use href="#x"/></svg></button>
+  <button class="close" data-done aria-label="Close"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
   <div id="sheetBody"></div>
 </dialog>
 
