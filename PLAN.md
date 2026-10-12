@@ -111,7 +111,7 @@ android/              Capacitor project (generated)
 - Rest notification checked on an Android 16 emulator: posted on the high-importance `rest` channel with the screen locked, ~10 s after the timer ended (the alarm itself fired on time). The APK reaches OmniRoute's http LAN address (mixed content + cleartext allowed).
 
 ## Updates and backups
-- **Android updates:** on open (at most every 6 h) the app reads `version.json` (written by copy-web.js from CI's VERSION_NAME) and GitHub's latest release; if newer, a banner offers Update (opens the APK in Chrome) or ✕ (skip that version). No Obtainium needed.
+- **Android updates:** on open (at most every 6 h) the app reads `version.json` (written by copy-web.js from CI's VERSION_NAME) and GitHub's latest release; if newer, a banner offers Update (downloads the APK in-app and opens the installer) or ✕ (skip that version). No Obtainium needed.
 - **Backups:** Settings → Save Backup (share sheet on phones, download on desktop; the Android app uses the Filesystem + Share plugins). The file never holds AI keys; Restore keeps this phone's AI setup. Every rendered field from a backup file is checked first (`store.test.js`). Workout tab nags after 14 days without a backup.
 
 ## Open risks

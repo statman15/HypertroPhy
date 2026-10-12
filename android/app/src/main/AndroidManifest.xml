@@ -43,6 +43,8 @@
     <!-- Rest timer: exact alarms, auto-granted on Android 13+, so the plugin never sends you to a settings screen mid-workout. -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- In-app updater: opens the downloaded APK in the system installer. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Health Connect: weight is the only thing read (never written). The plugin declares every health type; these lines strip the rest. -->
     <uses-permission android:name="android.permission.health.READ_WEIGHT" />
     <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" />

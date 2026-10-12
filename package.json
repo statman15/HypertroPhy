@@ -9,6 +9,7 @@
     "sync": "node copy-web.js && cap sync android"
   },
   "dependencies": {
+    "@capacitor-community/file-opener": "8.0.1",
     "@capacitor/android": "8.5.3",
     "@capacitor/core": "8.5.3",
     "@capacitor/filesystem": "^8.1.4",

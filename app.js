@@ -234,7 +234,7 @@ async function saveBackup() {
 document.addEventListener('click', ev => { if (ev.target.closest('[data-backup]')) saveBackup(); });
 
 // --- Android app: a banner when GitHub has a newer release. Checked on open and on return, at most every 6 hours.
-// Update navigates to the APK, which Capacitor hands to the system browser; Android then offers to install it over this one (same signing key, data kept).
+// Update downloads the APK in-app and opens Android's installer over this one (same signing key, data kept). A Chrome background download got stuck at the end on Chris's phone, so it's not used; on any failure we fall back to the release page.
 const native = window.Capacitor?.isNativePlatform?.();
 const newer = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
 let checkedAt = 0;
@@ -247,7 +247,23 @@ async function checkUpdate() {
     const latest = String(rel.tag_name || '').replace(/^v/, ''), apk = rel.assets?.find(a => a.name.endsWith('.apk'))?.browser_download_url;
     if (version === 'dev' || !apk || !newer(latest, version) || localStorage.getItem('skipUpdate') === latest) return;
     $('#updateText').textContent = `Update available: ${latest}`;
-    $('#updateGo').href = apk;
+    $('#updateGo').onclick = async ev => {
+      ev.preventDefault();
+      const go = $('#updateGo'), text = $('#updateText'), { Filesystem, FileOpener } = window.Capacitor.Plugins;
+      go.style.pointerEvents = 'none'; // it's a link, so `disabled` does nothing
+      const prog = await Filesystem.addListener('progress', p => { if (p.contentLength) text.textContent = `Downloading ${latest}… ${Math.round(100 * p.bytes / p.contentLength)}%`; });
+      text.textContent = `Downloading ${latest}…`;
+      try {
+        const r = await Filesystem.downloadFile({ url: apk, path: `HypertroPhy-${latest}.apk`, directory: 'CACHE', progress: true, recursive: true });
+        await FileOpener.open({ filePath: r.path, contentType: 'application/vnd.android.package-archive', openWithDefault: true });
+        text.textContent = 'Follow the installer to update';
+      } catch {
+        text.textContent = "Couldn't download the update. Opening the release page…";
+        location.href = rel.html_url;
+      }
+      prog.remove();
+      go.style.pointerEvents = '';
+    };
     $('#updateSkip').onclick = () => { localStorage.setItem('skipUpdate', latest); $('#update').hidden = true; };
     $('#update').hidden = false;
   } catch {} // offline or rate-limited: try again next time
