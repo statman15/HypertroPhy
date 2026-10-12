@@ -1,6 +1,7 @@
 // The Workout tab: routines when idle, the live logger during a workout, and the routine editor.
 import { $, esc, num, day, clock, icon, restOptions, sheet, closeSheet } from './ui.js';
-import { db, save, uid, lastSets, records, e1rm, volume } from './store.js';
+import { db, save, uid, lastSets, sessions, records, e1rm, volume } from './store.js';
+import { nextTarget, stepFor, DEFAULT_RANGE } from './progression.js';
 
 let lib, pick, onFinish, info, editing = null, lock = null, audio = null;
 const root = () => $('#workout');
@@ -52,13 +53,13 @@ function activeHtml() {
     ${a.items.map((it, i) => `<section class="ex${it.ss || a.items[i - 1]?.ss ? ' ss' : ''}">
       <div class="ex-head"><button class="ex-name" data-act="info" data-i="${i}">${esc(name(it.exId))}</button>
         <button class="iconbtn" data-act="menu" data-i="${i}" aria-label="Exercise options">${icon('dots')}</button></div>
-      <div class="ex-sub">${it.repMin ? `<span>${it.repMin}–${it.repMax} reps</span>` : ''}
+      <div class="ex-sub">${targetHtml(it)}
         <label class="mini"><span class="visually-hidden">Rest timer</span><select data-rest="${i}">${restOptions(it.rest)}</select></label></div>
       <table class="sets"><thead><tr><th>Set</th><th>Previous</th><th>${u}</th><th>Reps</th><th><span class="visually-hidden">Done</span></th></tr></thead><tbody>
       ${it.sets.map((s, j) => { const p = prevSet(it, j); return `<tr${s.done ? ' class="done"' : ''}>
         <td>${j + 1}</td><td class="prev">${p ? `${num(p.w)}×${p.r}` : '–'}</td>
-        <td><input inputmode="decimal" data-i="${i}" data-j="${j}" data-f="w" value="${esc(s.w)}" placeholder="${p ? num(p.w) : ''}" aria-label="Set ${j + 1} weight"></td>
-        <td><input inputmode="numeric" data-i="${i}" data-j="${j}" data-f="r" value="${esc(s.r)}" placeholder="${p?.r ?? it.repMax ?? ''}" aria-label="Set ${j + 1} reps"></td>
+        <td><input inputmode="decimal" data-i="${i}" data-j="${j}" data-f="w" value="${esc(s.w)}" placeholder="${hint(it, j) ? num(hint(it, j).w) : ''}" aria-label="Set ${j + 1} weight"></td>
+        <td><input inputmode="numeric" data-i="${i}" data-j="${j}" data-f="r" value="${esc(s.r)}" placeholder="${hint(it, j)?.r ?? range(it).repMax}" aria-label="Set ${j + 1} reps"></td>
         <td><button class="check" data-act="check" data-i="${i}" data-j="${j}" aria-pressed="${!!s.done}" aria-label="Set ${j + 1} done">${icon('check')}</button></td>
       </tr>`; }).join('')}
       </tbody></table>
@@ -92,6 +93,21 @@ const linkBtn = (it, i) => `<button class="link${it.ss ? ' on' : ''}" data-act="
 
 // Last session's set at the same position, or its last set when today has more sets.
 function prevSet(it, j) { const p = lastSets(it.exId); return p[j] || p.at(-1); }
+
+const range = it => it.repMin ? it : DEFAULT_RANGE;
+const target = it => nextTarget(sessions(it.exId).map(s => s.sets), { ...range(it), ...stepFor(lib[it.exId], db.settings.units) });
+// What an empty box means: today's target, else last time's set.
+const hint = (it, j) => target(it) || prevSet(it, j);
+
+function targetHtml(it) {
+  const t = target(it), u = db.settings.units, { repMin, repMax } = range(it);
+  const text = !t ? `${repMin}–${repMax} reps`
+    : t.kind === 'up' ? `Go up: ${num(t.w)} ${u} × ${t.r}`
+    : t.kind === 'deload' ? `Deload: ${num(t.w)} ${u} × ${t.r}`
+    : t.kind === 'reps' ? `Target: ${t.r} reps`
+    : `Target: ${num(t.w)} ${u} × ${t.r}`;
+  return `<span class="target ${t?.kind || ''}">${text}</span>${t ? `<span>${repMin}–${repMax}</span>` : ''}`;
+}
 
 function onClick(ev) {
   const b = ev.target.closest('[data-act]');
@@ -185,14 +201,14 @@ function menu(i) {
   };
 }
 
-// Fills blanks from the placeholders (last time's numbers), so a repeat set is one tap.
+// Fills blanks from the placeholders (today's target or last time's numbers), so hitting the target is one tap.
 function check(i, j) {
   const it = db.active.items[i], s = it.sets[j];
   if (s.done) return !(s.done = false);
-  const p = prevSet(it, j);
+  const p = hint(it, j);
   const bodyweight = ['body only', 'none'].includes(lib[it.exId]?.equipment);
   const w = s.w !== '' ? parse(s.w) : p ? +p.w : bodyweight ? 0 : NaN;
-  const r = s.r === '' ? +(p?.r ?? it.repMax ?? 0) : parseInt(s.r);
+  const r = s.r === '' ? +(p?.r ?? range(it).repMax) : parseInt(s.r);
   if (!(r > 0) || isNaN(w)) {
     root().querySelector(`[data-i="${i}"][data-j="${j}"][data-f="${isNaN(w) ? 'w' : 'r'}"]`)?.focus();
     return false;

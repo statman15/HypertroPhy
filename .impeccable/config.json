@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "index.html"
+        ],
+        "createdAt": "2026-10-12T02:50:00.167Z",
+        "reason": "Claude: .ex.ss rail is a functional superset-group marker (Hevy-style), not a decorative card accent"
+      }
+    ]
+  }
+}

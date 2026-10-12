@@ -55,13 +55,14 @@ function show(e) {
     ['Primary', e.primaryMuscles], ['Secondary', e.secondaryMuscles], ['Equipment', [e.equipment]],
     ['Level', [e.level]], ['Type', [e.category]], ['Mechanic', [e.mechanic]],
   ].filter(([, v]) => v.length && v[0]);
-  sheet(`
+  const body = sheet(`
     <div class="demo">${e.images.slice(0, 2).map((p, i) => img(p, i ? 'End position' : 'Start position')).join('')}</div>
     <h2 id="sheetTitle">${esc(e.name)}</h2>
     <dl class="facts group">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v.map(cap).join(', '))}</dd></div>`).join('')}</dl>
     ${history.exerciseHistory(e.id)}
     <h3>How to</h3>
     <ol class="steps">${e.instructions.map(s => `<li>${esc(s)}</li>`).join('')}</ol>`);
+  history.bindChart(body);
 }
 
 $('#list').addEventListener('click', ev => {
