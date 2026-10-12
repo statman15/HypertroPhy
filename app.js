@@ -29,8 +29,8 @@ $('#tabs').addEventListener('click', ev => { const b = ev.target.closest('[data-
 
 function pick(cb, preset = {}) {
   $('#q').value = '';
-  $('#muscle').value = preset.muscle || '';
-  $('#equip').value = preset.equip || '';
+  filters.muscles = preset.muscle ? [preset.muscle] : [];
+  filters.equip = [];
   go('exercises');
   pickCb = cb;
   renderLib();
@@ -38,11 +38,24 @@ function pick(cb, preset = {}) {
 $('#pickCancel').addEventListener('click', () => go('workout'));
 
 // --- Exercises tab
-for (const [sel, key] of [[$('#muscle'), 'primaryMuscles'], [$('#equip'), 'equipment']])
-  sel.insertAdjacentHTML('beforeend', values(all, key).map(v => `<option value="${esc(v)}">${esc(cap(v))}</option>`).join(''));
+// Muscle and equipment filters: each chip opens a checklist sheet; pick any number, the list updates behind it.
+const filters = { muscles: [], equip: [] };
+const choices = { muscles: values(all, 'primaryMuscles'), equip: values(all, 'equipment') };
+const label = (picked, all, noun) => !picked.length ? `All ${all}` : picked.length === 1 ? cap(picked[0]) : `${picked.length} ${noun}`;
+
+function openFilter(kind) {
+  const body = sheet(`<h2 id="sheetTitle">${kind === 'muscles' ? 'Muscles' : 'Equipment'}</h2>
+    <div class="checks">${choices[kind].map(v => `<label><input type="checkbox" value="${esc(v)}"${filters[kind].includes(v) ? ' checked' : ''}>${esc(cap(v))}</label>`).join('')}</div>
+    <div class="sheet-actions"><button class="pill quiet" data-clear>Clear</button><button class="pill" data-done></button></div>`);
+  const count = () => { body.querySelector('[data-done]').textContent = `Show ${$('#count').textContent.split(' ')[0]}`; };
+  body.onchange = () => { filters[kind] = [...body.querySelectorAll(':checked')].map(c => c.value); renderLib(); count(); };
+  body.onclick = ev => { if (ev.target.closest('[data-clear]')) { body.querySelectorAll(':checked').forEach(c => { c.checked = false; }); body.onchange(); } };
+  count();
+}
+document.querySelector('.filters').addEventListener('click', ev => { const b = ev.target.closest('[data-filter]'); if (b) openFilter(b.dataset.filter); });
 
 function renderLib() {
-  const list = filter(all, { q: $('#q').value, muscle: $('#muscle').value, equip: $('#equip').value });
+  const list = filter(all, { q: $('#q').value, ...filters });
   $('#pickBar').hidden = !pickCb;
   $('#count').textContent = `${list.length} exercise${list.length === 1 ? '' : 's'}`;
   $('#list').innerHTML = list.map(e => `<li><button class="row" data-id="${esc(e.id)}">
@@ -50,7 +63,10 @@ function renderLib() {
     <span><span class="t">${esc(e.name)}</span><span class="a">${esc(cap(e.primaryMuscles[0] || ''))} · ${esc(cap(e.equipment))}</span></span>
   </button></li>`).join('');
   $('#empty').hidden = list.length > 0;
-  for (const s of [$('#muscle'), $('#equip')]) s.parentElement.classList.toggle('on', !!s.value);
+  $('#muscleBtn').textContent = label(filters.muscles, 'Muscles', 'muscles');
+  $('#equipBtn').textContent = label(filters.equip, 'Equipment', 'kinds');
+  $('#muscleBtn').classList.toggle('on', filters.muscles.length > 0);
+  $('#equipBtn').classList.toggle('on', filters.equip.length > 0);
 }
 
 function show(e) {
@@ -81,8 +97,8 @@ $('#list').addEventListener('click', ev => {
 $('#sheet').addEventListener('click', ev => {
   if (ev.target === ev.currentTarget || ev.target.closest('[data-done]')) $('#sheet').close();
 });
-for (const el of ['#q', '#muscle', '#equip']) $(el).addEventListener('input', renderLib);
-$('#clear').addEventListener('click', () => { $('#q').value = $('#muscle').value = $('#equip').value = ''; renderLib(); });
+$('#q').addEventListener('input', renderLib);
+$('#clear').addEventListener('click', () => { $('#q').value = ''; filters.muscles = []; filters.equip = []; renderLib(); });
 
 // --- Settings tab
 function renderSettings() {
@@ -104,8 +120,10 @@ function renderSettings() {
       <label>Address<input data-ai="url" value="${esc(c.url)}" placeholder="https://…/v1" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
 ${PRESETS[ai.preset].home ? `<label>Home address<input data-ai="home" value="${esc(c.home || "")}" placeholder="optional, e.g. http://192.168.1.37:20128/v1" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false"></label>` : ""}
       <label>API key<input data-ai="key" type="password" value="${esc(c.key)}" autocomplete="off"></label>
-      <label>Model<input data-ai="model" list="modelList" value="${esc(c.model)}" placeholder="Tap Test to list models" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
-      <datalist id="modelList"></datalist>
+      ${c.models?.length
+        ? `<label>Model<select data-ai="model">${[...new Set([c.model, ...c.models].filter(Boolean))].map(m =>
+            `<option${m === c.model ? ' selected' : ''}>${esc(m)}</option>`).join('')}</select></label>`
+        : `<label>Model<input data-ai="model" value="${esc(c.model)}" placeholder="Tap Test to list models" autocapitalize="off" autocomplete="off" spellcheck="false"></label>`}
     </div>
     <button class="pill wide" data-test>Test Connection</button>
     <p class="muted" id="aiMsg" role="status">The key is stored only on this phone.</p>
@@ -123,18 +141,21 @@ $('#settings').addEventListener('click', async ev => {
   if (!b) return;
   if (b.dataset.units) { setUnits(b.dataset.units); return renderSettings(); }
   if (b.dataset.preset) { db.settings.ai.preset = b.dataset.preset; save('settings'); return renderSettings(); }
-  // Test: list the models (fills the picker, and picks one if none is set), then ask for a one-word reply.
-  const msg = $('#aiMsg');
-  b.disabled = true; msg.textContent = 'Connecting…';
+  // Test: fetch the model list (kept, so Model becomes a dropdown), pick one if none is set, then ask for a one-word reply.
+  const say = t => { $('#aiMsg').textContent = t; };
+  b.disabled = true; say('Connecting…');
   try {
-    const list = await models();
-    $('#modelList').innerHTML = list.map(m => `<option value="${esc(m)}">`).join('');
-    const c = conn();
-    if (!c.model) { c.model = list.find(m => /flash|auto/.test(m)) || list[0] || ''; save('settings'); $('[data-ai=model]').value = c.model; }
+    const list = await models(), c = conn();
+    c.models = list;
+    if (!c.model) c.model = list.find(m => /flash|auto/.test(m)) || list[0] || '';
+    save('settings');
+    renderSettings();
+    say('Connecting…');
     await chat([{ role: 'user', content: 'Reply with the single word OK.' }]);
-    msg.textContent = `Connected${ai.via ? ` via ${ai.via === 'home' ? 'home address' : ai.via}` : ''} · ${c.model} · ${list.length} models available`;
-  } catch (e) { msg.textContent = e.message; }
-  b.disabled = false;
+    say(`Connected${ai.via ? ` via ${ai.via === 'home' ? 'home address' : ai.via}` : ''} · ${c.model} · ${list.length} models available`);
+  } catch (e) { say(e.message); }
+  const btn = $('#settings [data-test]');
+  if (btn) btn.disabled = false;
 });
 $('#settings').addEventListener('change', async ev => {
   if (ev.target.id !== 'importFile') return;

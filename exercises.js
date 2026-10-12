@@ -10,12 +10,13 @@ export async function load() {
   return list.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// Every search word must appear in the name; muscle matches the primary muscle only, like Hevy.
-export function filter(list, { q = '', muscle = '', equip = '' }) {
+// Every search word must appear in the name. Muscles and equipment are any-of lists (empty = all);
+// muscle matches the primary muscle only, like Hevy.
+export function filter(list, { q = '', muscles = [], equip = [] }) {
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
   return list.filter(e =>
-    (!muscle || e.primaryMuscles.includes(muscle)) &&
-    (!equip || e.equipment === equip) &&
+    (!muscles.length || e.primaryMuscles.some(m => muscles.includes(m))) &&
+    (!equip.length || equip.includes(e.equipment)) &&
     words.every(w => e.name.toLowerCase().includes(w)));
 }
 

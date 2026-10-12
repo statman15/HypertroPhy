@@ -12,7 +12,7 @@ export const restOptions = cur => REST.map(s => `<option value="${s}"${s === +cu
 export function sheet(html) {
   const d = $('#sheet');
   $('#sheetBody').innerHTML = html;
-  $('#sheetBody').onclick = null; // drop the last sheet's handler
+  $('#sheetBody').onclick = $('#sheetBody').onchange = null; // drop the last sheet's handlers
   if (!d.open) d.showModal();
   d.scrollTop = 0;
   return $('#sheetBody');
