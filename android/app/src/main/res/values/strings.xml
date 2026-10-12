@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">HypertroPhy</string>
+    <string name="title_activity_main">HypertroPhy</string>
+    <string name="package_name">com.statman15.hypertrophy</string>
+    <string name="custom_url_scheme">com.statman15.hypertrophy</string>
+</resources>

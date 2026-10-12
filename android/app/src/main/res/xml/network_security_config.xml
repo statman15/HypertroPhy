@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Plain http is allowed so the AI coach can reach OmniRoute's LAN address at home (Tailscale is off there).
+     ponytail: cleartext for every host; narrow to a domain-config if more than user-entered AI addresses ever use it. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

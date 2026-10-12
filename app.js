@@ -9,7 +9,7 @@ const { PRESETS, conn, models, chat } = ai;
 
 const img = (path, alt = '') => path ? `<img src="${photo(path)}" crossorigin="anonymous" loading="lazy" alt="${alt}">` : '';
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {}); // photo cache; optional
 
 const all = await load();
 const byId = Object.fromEntries(all.map(e => [e.id, e]));

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launch screen: the icon's orange with the dumbbell centred (replaces Capacitor's logo PNGs). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item><color android:color="#C2410C"/></item>
+    <item android:drawable="@drawable/ic_launcher_dumbbell" android:gravity="center" android:width="160dp" android:height="160dp"/>
+</layer-list>

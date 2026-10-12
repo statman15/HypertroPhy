@@ -1,0 +1,11 @@
+{
+  "appId": "com.statman15.hypertrophy",
+  "appName": "HypertroPhy",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": true
+  },
+  "plugins": {
+    "LocalNotifications": { "smallIcon": "ic_stat_dumbbell", "iconColor": "#c2410c" }
+  }
+}

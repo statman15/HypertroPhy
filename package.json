@@ -1,0 +1,19 @@
+{
+  "name": "hypertrophy",
+  "private": true,
+  "type": "module",
+  "description": "npm is only for the Capacitor Android shell; the web app itself has no build step.",
+  "scripts": {
+    "test": "node progression.test.js && node ai.test.js",
+    "www": "node copy-web.js",
+    "sync": "node copy-web.js && cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/local-notifications": "8.3.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}

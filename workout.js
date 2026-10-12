@@ -9,6 +9,20 @@ const name = id => lib[id]?.name || id;
 const blankSets = n => Array.from({ length: n }, () => ({ w: '', r: '' }));
 const parse = v => parseFloat(String(v).replace(',', '.'));
 
+// Android app only: the rest timer is also a system notification, so it buzzes with the phone locked.
+const notes = window.Capacitor?.isNativePlatform?.() && window.Capacitor.Plugins.LocalNotifications;
+notes?.createChannel({ id: 'rest', name: 'Rest timer', importance: 5, vibration: true }).catch(() => {});
+async function syncRestNote() {
+  if (!notes) return;
+  try {
+    await notes.cancel({ notifications: [{ id: 1 }] });
+    const end = db.active?.restEnd;
+    if (!end || end <= Date.now()) return;
+    if ((await notes.checkPermissions()).display !== 'granted' && (await notes.requestPermissions()).display !== 'granted') return;
+    await notes.schedule({ notifications: [{ id: 1, channelId: 'rest', title: 'Rest over', body: 'Time for your next set.', schedule: { at: new Date(end), allowWhileIdle: true } }] });
+  } catch {} // no notification is fine: the in-app timer still runs
+}
+
 export function init(byId, picker, finished, showInfo, planBuilder) {
   [lib, pick, onFinish, info, buildPlan] = [byId, picker, finished, showInfo, planBuilder];
   root().addEventListener('click', onClick);
@@ -18,6 +32,7 @@ export function init(byId, picker, finished, showInfo, planBuilder) {
     if (!b || !db.active) return;
     db.active.restEnd = b.dataset.adj ? db.active.restEnd + b.dataset.adj * 1000 : 0;
     save('active');
+    syncRestNote();
     tick();
   });
   document.addEventListener('visibilitychange', keepAwake);
@@ -137,6 +152,7 @@ function onClick(ev) {
       db.active = null; keepAwake(); break;
   }
   save('active');
+  syncRestNote();
   render();
 }
 
@@ -240,6 +256,7 @@ function finish() {
   db.workouts.unshift(w);
   db.active = null;
   save('workouts', 'active');
+  syncRestNote();
   keepAwake();
   render();
   onFinish(w);
