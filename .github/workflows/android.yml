@@ -50,8 +50,9 @@ jobs:
         run: |
           cd android && ./gradlew assembleRelease --no-daemon
           cp app/build/outputs/apk/release/app-release.apk "../HypertroPhy-$VERSION_NAME.apk"
+          rm -f "$KEYSTORE_FILE"  # the third-party release step below never sees the signing key
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3, pinned to a commit
         with:
           tag_name: v${{ env.VERSION_NAME }}
           name: HypertroPhy ${{ env.VERSION_NAME }}
