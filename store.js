@@ -7,6 +7,8 @@ export const db = {
   routines: read('routines', []),
   workouts: read('workouts', []), // newest first
   active: read('active', null),   // the workout in progress, saved on every change so a closed app loses nothing
+  profile: read('profile', null), // plan-builder answers: goal, days, minutes, level, equipment, avoid
+  chat: read('chat', []),         // coach conversation, last 50 messages
 };
 export const save = (...keys) => { for (const k of keys) localStorage.setItem(k, JSON.stringify(db[k])); };
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);

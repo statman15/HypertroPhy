@@ -3,6 +3,14 @@
 // Returns { w, r, kind } with kind 'up' | 'hold' | 'deload' | 'reps', or null with no history.
 
 export const DEFAULT_RANGE = { repMin: 8, repMax: 12 };
+
+// The goal sets rep range and rest for AI plans, and the default range for exercises outside a routine.
+export const GOALS = {
+  strength: { label: 'Build strength', repMin: 3, repMax: 6, rest: 180 },
+  muscle: { label: 'Gain muscle', repMin: 8, repMax: 12, rest: 90 },
+  tone: { label: 'Get toned', repMin: 10, repMax: 15, rest: 60 },
+  fatloss: { label: 'Lose fat', repMin: 12, repMax: 15, rest: 45 },
+};
 const LOWER = ['quadriceps', 'hamstrings', 'glutes'];
 
 // Barbell lower-body lifts jump +10 lb / +5 kg; everything else +5 lb / +2.5 kg. round is the plate step for deloads.

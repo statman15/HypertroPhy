@@ -78,11 +78,13 @@ android/              Capacitor project (generated)
 1. ✅ **Library.** Copy `exercises.json` (check its path in the repo and pin a commit). Browse and filter by equipment and muscle, search, detail page with the photo flip and instructions. Create the repo and turn on Pages. *Done when:* the Library works on both phones from Pages.
 2. ✅ **Logging.** Start an empty workout or one from a routine; add/remove sets; rest timer + Wake Lock; finish and save; History list + detail; PRs (heaviest weight, best estimated 1RM = w×(1+r/30)); routines CRUD; supersets.
 3. ✅ **Progression + charts.** `nextTarget()` plus its test; targets shown inline while logging; a per-exercise SVG chart of estimated 1RM over time.
-4. **AI.** Settings for URL/key/model with a "Test" button. **Check first** that Gemini's OpenAI-compatible endpoint allows browser (CORS) calls; if it doesn't, fall back to Gemini's own REST format in `ai.js`. Plan builder: goal form → filter the library to the user's equipment → send the trimmed exercise list → JSON plan → drop any ID not in the library → save as routines. Coach: chat with the profile, plan and 4-week summary in the system prompt.
+4. ✅ **AI.** Settings for URL/key/model with a "Test" button. **Check first** that Gemini's OpenAI-compatible endpoint allows browser (CORS) calls; if it doesn't, fall back to Gemini's own REST format in `ai.js`. Plan builder: goal form → filter the library to the user's equipment → send the trimmed exercise list → JSON plan → drop any ID not in the library → save as routines. Coach: chat with the profile, plan and 4-week summary in the system prompt.
 5. **Android.** `npx cap init` + `cap add android`; LocalNotifications for the rest timer; generate a keystore (back it up in the password manager, since every future APK needs it); `android.yml` builds the signed APK and publishes a Release. Export goes through the Filesystem + Share plugins, because the WebView can't share files. Check that `sw.js` registers inside the Capacitor WebView. If it doesn't, photos fall back to the WebView's HTTP cache (jsDelivr sends a 1-year max-age).
-6. **Backup + polish.** Export/Import, the 14-day banner, empty states, icons.
+6. **Backup + polish.** Export/Import (leave the AI keys out of the export file), the 14-day banner, empty states, icons.
 
 ## Open risks
-- Gemini CORS (checked first in phase 4).
+- ~~Gemini CORS~~: checked, both Gemini and OmniRoute allow browser calls from the Pages origin.
+- OmniRoute is plain http on the LAN, which an https page cannot call. It needs Tailscale Serve on `pve` (`tailscale serve --bg --https=20128 http://192.168.1.37:20128`), which needs HTTPS certificates turned on in the Tailscale admin console. Only phones on Tailscale can use it; Gemini works anywhere.
+- The full-gym plan prompt is ~9k tokens (534 exercises). Fine for Gemini Flash; a small-context model may refuse it.
 - An installed iPhone PWA keeps its storage, but deleting the home-screen icon wipes it, so the backup nag matters.
 - jsDelivr outage → no photos for exercises that haven't been cached yet. Acceptable.

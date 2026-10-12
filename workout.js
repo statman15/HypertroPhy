@@ -1,16 +1,16 @@
 // The Workout tab: routines when idle, the live logger during a workout, and the routine editor.
 import { $, esc, num, day, clock, icon, restOptions, sheet, closeSheet } from './ui.js';
 import { db, save, uid, lastSets, sessions, records, e1rm, volume } from './store.js';
-import { nextTarget, stepFor, DEFAULT_RANGE } from './progression.js';
+import { nextTarget, stepFor, DEFAULT_RANGE, GOALS } from './progression.js';
 
-let lib, pick, onFinish, info, editing = null, lock = null, audio = null;
+let lib, pick, onFinish, info, buildPlan, editing = null, lock = null, audio = null;
 const root = () => $('#workout');
 const name = id => lib[id]?.name || id;
 const blankSets = n => Array.from({ length: n }, () => ({ w: '', r: '' }));
 const parse = v => parseFloat(String(v).replace(',', '.'));
 
-export function init(byId, picker, finished, showInfo) {
-  [lib, pick, onFinish, info] = [byId, picker, finished, showInfo];
+export function init(byId, picker, finished, showInfo, planBuilder) {
+  [lib, pick, onFinish, info, buildPlan] = [byId, picker, finished, showInfo, planBuilder];
   root().addEventListener('click', onClick);
   root().addEventListener('input', onInput);
   $('#rest').addEventListener('click', ev => {
@@ -34,9 +34,10 @@ function idleHtml() {
   return `<div class="head"><h1>Workout</h1></div>
   <div class="pad">
     <button class="pill wide" data-act="empty">Start Empty Workout</button>
+    <button class="pill wide quiet" data-act="plan">${icon('sparkle')}Build a Plan with AI</button>
     <div class="sec"><h2>Routines</h2><button class="text-btn" data-act="new">New Routine</button></div>
     ${db.routines.length ? db.routines.map(r => `<div class="card group">
-      <div class="card-top"><b>${esc(r.name)}</b><button class="text-btn" data-act="edit" data-id="${r.id}">Edit</button></div>
+      <div class="card-top"><b>${esc(r.name)}${r.ai ? ' <small class="pr">AI plan</small>' : ''}</b><button class="text-btn" data-act="edit" data-id="${r.id}">Edit</button></div>
       <p class="a">${esc(r.items.map(it => name(it.exId)).join(', ') || 'No exercises yet')}</p>
       <button class="pill wide" data-act="start" data-id="${r.id}">Start Routine</button>
     </div>`).join('') : '<p class="muted">No routines yet. Make one here, or finish a workout and save it as a routine from History.</p>'}
@@ -94,7 +95,7 @@ const linkBtn = (it, i) => `<button class="link${it.ss ? ' on' : ''}" data-act="
 // Last session's set at the same position, or its last set when today has more sets.
 function prevSet(it, j) { const p = lastSets(it.exId); return p[j] || p.at(-1); }
 
-const range = it => it.repMin ? it : DEFAULT_RANGE;
+const range = it => it.repMin ? it : GOALS[db.profile?.goal] || DEFAULT_RANGE;
 const target = it => nextTarget(sessions(it.exId).map(s => s.sets), { ...range(it), ...stepFor(lib[it.exId], db.settings.units) });
 // What an empty box means: today's target, else last time's set.
 const hint = (it, j) => target(it) || prevSet(it, j);
@@ -124,6 +125,7 @@ function onClick(ev) {
       if (!confirm(`Delete the routine "${editing.name}"? Past workouts stay in History.`)) return;
       db.routines = db.routines.filter(r => r.id !== editing.id); save('routines'); editing = null; break;
     case 'add': return pick(ex => addExercise(ex.id));
+    case 'plan': return buildPlan(render);
     case 'info': return info(a.items[i].exId);
     case 'menu': return menu(i);
     case 'ss': t.items[i].ss = !t.items[i].ss; break;
