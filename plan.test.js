@@ -42,4 +42,8 @@ assert.equal(db.plan.weeks[1][0].items[0].exId, 'Ex6', 'plans survive a backup')
 assert.equal(db.plans.length, 1);
 const bad = structuredClone(file); bad.plan.weeks[0][0].items[0].exId = '"><img src=x>';
 assert.throws(() => restore(bad), /isn't a HypertroPhy backup/, 'plan items are checked on restore');
+const bad2 = structuredClone(file); bad2.routines[0].week = "<img src=x onerror=alert(1)>"; bad2.routines[0].extra = "junk";
+restore(bad2);
+assert.equal(db.routines[0].week, undefined, "a non-number week is dropped on restore");
+assert.equal(db.routines[0].extra, undefined, "unknown routine fields are dropped");
 console.log('plan: all checks pass');

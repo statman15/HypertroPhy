@@ -74,7 +74,7 @@ ${backupDue() ? `<div class="card group nag"><b>Back up your workouts</b><p clas
     ${db.plan && !monthDone() ? '' : `<button class="pill wide quiet" data-act="plan">${icon('sparkle')}${db.plan ? 'Build Next Month' : 'Build a Month Plan with AI'}</button>`}
     <div class="sec"><h2>Routines</h2><button class="text-btn" data-act="new">New Routine</button></div>
     ${db.routines.length ? db.routines.map(r => `<div class="card group">
-      <div class="card-top"><b>${esc(r.name)}${r.ai ? ` <small class="pr">${r.week ? `Week ${r.week}` : 'AI plan'}</small>` : ''}</b><button class="text-btn" data-act="edit" data-id="${r.id}">Edit</button></div>
+      <div class="card-top"><b>${esc(r.name)}${r.ai ? ` <small class="pr">${r.week ? `Week ${r.week | 0}` : 'AI plan'}</small>` : ''}</b><button class="text-btn" data-act="edit" data-id="${r.id}">Edit</button></div>
       <p class="a">${esc(r.items.map(it => name(it.exId)).join(', ') || 'No exercises yet')}</p>
       <button class="pill wide" data-act="start" data-id="${r.id}">Start Routine</button>
     </div>`).join('') : '<p class="muted">No routines yet. Make one here, or finish a workout and save it as a routine from History.</p>'}
