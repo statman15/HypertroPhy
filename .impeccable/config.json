@@ -11,6 +11,15 @@
         ],
         "createdAt": "2026-10-12T02:50:00.167Z",
         "reason": "Claude: .ex.ss rail is a functional superset-group marker (Hevy-style), not a decorative card accent"
+      },
+      {
+        "rule": "pulsing-dot",
+        "value": "*",
+        "files": [
+          "index.html"
+        ],
+        "createdAt": "2026-10-12T03:03:41.065Z",
+        "reason": "Claude: .typing dots show only while an AI request is in flight (genuinely live state), removed when the reply lands"
       }
     ]
   }
