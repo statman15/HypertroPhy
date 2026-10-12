@@ -1,6 +1,6 @@
 // Run: node progression.test.js
 import assert from 'node:assert/strict';
-import { nextTarget, stepFor, plates, warmups } from './progression.js';
+import { nextTarget, stepFor, plates, warmups, nextHold } from './progression.js';
 
 const range = { repMin: 8, repMax: 12, step: 5, round: 5 };
 const s = (w, ...reps) => reps.map(r => ({ w, r }));
@@ -35,3 +35,9 @@ assert.deepEqual(warmups(60, { bar: 45, round: 5 }), [{ w: 45, r: 8 }, { w: 50, 
 assert.deepEqual(warmups(30, { round: 5 }), [{ w: 15, r: 8 }, { w: 20, r: 5 }, { w: 25, r: 3 }], 'dumbbells: no bar');
 assert.deepEqual(warmups(225, { bar: 45, round: 10 }), [{ w: 45, r: 10 }, { w: 105, r: 8 }, { w: 155, r: 5 }, { w: 185, r: 3 }], 'without 2.5s every warm-up is bar + 5s pairs');
 console.log('plates + warm-ups: all checks pass');
+
+assert.equal(nextHold([], { repMin: 20 }), null, 'no history, no hold target');
+assert.deepEqual(nextHold([s(0, 45, 40)], { repMin: 20 }), { w: 0, r: 45, kind: 'time' }, '+5 s on the shortest hold');
+assert.deepEqual(nextHold([s(0, 10)], { repMin: 20 }), { w: 0, r: 20, kind: 'time' }, 'never under the range bottom');
+assert.deepEqual(nextHold([[], s(25, 30, 30)], { repMin: 20 }), { w: 25, r: 35, kind: 'time' }, 'weighted holds keep their weight');
+console.log('holds: all checks pass');

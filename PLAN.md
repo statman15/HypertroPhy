@@ -89,6 +89,10 @@ android/              Capacitor project (generated)
 - **Warm-ups**: exercise ⋯ → Add Warm-up Sets: empty bar ×10, 50% ×8, 70% ×5, 85% ×3 of the working weight, marked W. Warm-ups never count toward volume, records, PRs, progression or "Previous", and start no rest timer.
 - **Plates**: barbell exercises get a Plates button listing plates per side for each set. Bar weight and owned plates are set in Settings. Barbell guesses, warm-ups and "go up" targets round to bar + plate pairs you can actually load.
 
+## Timed holds and AI rest (2026-10-12) ✅
+- **Timed exercises** (planks, side bridges, carries, cardio, stretches): `isTimed()` in exercises.js (force "static", cardio, carries), and the ⋯ menu switches any exercise between Track by Time and Track by Reps. Sets are seconds: a ▶ hold timer counts down the target, buzzes (Android notification id 2), logs the set and starts the rest; Done stops early and logs the time held. The default range is 20–60 s, the first-time default is 20 s, progression is +5 s on the shortest hold (`nextHold`), and the PR/record is the longest hold. Timed items are left out of volume.
+- **AI picks rest per exercise** (`rest_seconds`, snapped to the timer choices; heavy compounds longer, isolation and supersets shorter) and **seconds for holds**; the goal's rest is only the fallback.
+
 ## Android build notes
 - Web files are copied into `www/` by `npm run sync` (copy-web.js + cap sync); never edit `www/` or `android/app/src/main/assets` by hand.
 - Keystore: `~/hypertrophy-keystore` (release.p12, password.txt, release.p12.b64), also in repo secrets KEYSTORE_B64 / KEYSTORE_PASSWORD. **Back the folder up to the password manager**: every future APK must be signed with it or updates won't install.

@@ -19,7 +19,8 @@ export const uid = () => Date.now().toString(36) + Math.random().toString(36).sl
 export const e1rm = (w, r) => (+w || 0) * (1 + (+r || 0) / 30);
 // Warm-up sets (wu: true) never count toward volume, records, PRs or progression.
 export const working = sets => sets.filter(s => !s.wu);
-export const volume = items => items.reduce((t, it) => t + working(it.sets).reduce((s, x) => s + (+x.w || 0) * (+x.r || 0), 0), 0);
+// Timed items (seconds, not reps) are left out: weight × seconds isn't lifting volume.
+export const volume = items => items.reduce((t, it) => it.timed ? t : t + working(it.sets).reduce((s, x) => s + (+x.w || 0) * (+x.r || 0), 0), 0);
 
 // Sessions of one exercise, newest first: [{ date, sets }], working sets only.
 export const sessions = exId => db.workouts.flatMap(w => w.items.filter(it => it.exId === exId)

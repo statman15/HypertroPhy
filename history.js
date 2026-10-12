@@ -1,12 +1,16 @@
 // The History tab (body weight on top, then workouts), plus the per-exercise records shown in the library's detail sheet.
-import { $, esc, num, day, icon, sheet, closeSheet } from './ui.js';
+import { $, esc, num, day, clock, icon, sheet, closeSheet } from './ui.js';
 import { db, save, volume, records, sessions, e1rm, working, kcal, bodyweight } from './store.js';
 import { routineFrom } from './workout.js';
+import { isTimed } from './exercises.js';
 
 let lib;
 const name = id => lib[id]?.name || id;
 const mins = w => `${Math.max(1, Math.round((w.end - w.start) / 60000))} min`;
 const prs = w => w.items.reduce((n, it) => n + it.sets.filter(s => s.pr).length, 0);
+const isT = it => it.timed ?? isTimed(lib[it.exId]);
+const secs = n => n >= 60 ? clock(n * 1000) : `${n}s`;
+const setText = (s, T, u) => T ? `${+s.w ? `${num(s.w)} ${u} × ` : ''}${secs(+s.r)}` : `${num(s.w)} ${u} × ${s.r}`;
 const cal = w => kcal(w) ? ` · ~${kcal(w)} kcal` : '';
 
 // Android app only: weigh-ins can come from Health Connect (scales and fitness apps write there). Read-only.
@@ -48,7 +52,7 @@ export function detail(w) {
   const body = sheet(`<h2 id="sheetTitle">${esc(w.name)}</h2>
     <p class="muted">${day(w.start)} · ${mins(w)} · ${num(volume(w.items))} ${u}${cal(w)}</p>
     ${w.items.map(it => `<h3>${esc(name(it.exId))}</h3><ol class="group setlist">${it.sets.map(s =>
-      `<li${s.wu ? ' class="wu"' : ''}><span>${num(s.w)} ${u} × ${s.r}</span>${s.pr ? `<span class="pr">${icon('trophy')}PR</span>` : ''}</li>`).join('')}</ol>`).join('')}
+      `<li${s.wu ? ' class="wu"' : ''}><span>${setText(s, isT(it), u)}</span>${s.pr ? `<span class="pr">${icon('trophy')}PR</span>` : ''}</li>`).join('')}</ol>`).join('')}
     ${kcal(w) ? '<p class="muted">Calories are a rough estimate from your body weight and the workout\'s length.</p>' : ''}
     <div class="group menu-list gap">
       <button data-m="routine">Save as Routine</button>
@@ -136,6 +140,15 @@ async function importHealth(quiet) {
 export function exerciseHistory(exId) {
   const rec = records(exId), u = db.settings.units;
   if (!rec) return '';
+  if (isTimed(lib[exId])) {
+    const pts = sessions(exId).slice(0, 30).reverse().map(s => { const r = Math.max(...s.sets.map(x => +x.r || 0)); return { t: s.date, v: r, tip: `${day(s.date)}: ${secs(r)}` }; });
+    return `<h3>Your Records</h3><dl class="facts group">
+      <div><dt>Longest hold</dt><dd>${secs(rec.reps)}</dd></div>
+      ${rec.heaviest ? `<div><dt>Heaviest</dt><dd>${num(rec.heaviest)} ${u}</dd></div>` : ''}</dl>
+      ${lineChart(pts, 'Longest hold')}
+      <h3>Recent Sessions</h3><dl class="facts group">${sessions(exId).slice(0, 5).map(s =>
+        `<div><dt>${day(s.date)}</dt><dd>${s.sets.map(x => setText(x, true, u)).join(', ')}</dd></div>`).join('')}</dl>`;
+  }
   // Best estimated 1RM per session, oldest → newest.
   const pts = sessions(exId).slice(0, 30).reverse().map(s => {
     const best = s.sets.reduce((b, x) => e1rm(x.w, x.r) > e1rm(b.w, b.r) ? x : b);

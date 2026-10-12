@@ -21,3 +21,6 @@ export function filter(list, { q = '', muscles = [], equip = [] }) {
 }
 
 export const values = (list, key) => [...new Set(list.flatMap(e => e[key]))].sort();
+
+// Held for time rather than counted in reps: isometric holds and stretches (force "static"), cardio, carries.
+export const isTimed = e => !!e && (e.force === 'static' || e.category === 'cardio' || /farmer|carry|yoke walk|wall sit/i.test(e.name));

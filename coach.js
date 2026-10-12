@@ -2,6 +2,7 @@
 import { $, esc, num, day, icon, sheet, closeSheet } from './ui.js';
 import { db, save, uid, aboutYou } from './store.js';
 import { GOALS } from './progression.js';
+import { clock } from './ui.js';
 import * as ai from './ai.js';
 const { chat, candidates, planPrompt, parsePlan, EQUIPMENT } = ai;
 import { cap } from './exercises.js';
@@ -77,7 +78,7 @@ function context() {
     p ? `Profile: goal ${g.label} (${g.repMin}-${g.repMax} reps), ${p.days} days a week, ${p.minutes} min sessions, ${p.level}, equipment: ${p.equipment.join(', ')}${p.avoid ? `; avoid: ${p.avoid}` : ''}.` : 'No profile set yet.',
     'Routines:', ...(db.routines.length ? db.routines.map(r => `- ${r.name}: ${r.items.map(it => `${name(it.exId)} ${it.sets}x${it.repMin}-${it.repMax}`).join(', ')}`) : ['- none']),
     'Workouts in the last 4 weeks, newest first:',
-    ...(recent.length ? recent.map(w => `- ${day(w.start)} ${w.name}: ${w.items.map(it => `${name(it.exId)} ${it.sets.map(s => `${num(s.w)}x${s.r}`).join(' ')}`).join('; ')}`) : ['- none logged']),
+    ...(recent.length ? recent.map(w => `- ${day(w.start)} ${w.name}: ${w.items.map(it => `${name(it.exId)} ${it.sets.map(s => it.timed ? `${+s.w ? num(s.w) + 'x' : ''}${s.r}s` : `${num(s.w)}x${s.r}`).join(' ')}`).join('; ')}`) : ['- none logged']),
   ].filter(Boolean).join('\n');
 }
 
@@ -120,7 +121,7 @@ function preview(plan, done) {
     ${plan.via ? `<p class="muted">Built by ${plan.via}: your main AI service couldn't be reached.</p>` : ''}
     ${plan.dropped ? `<p class="muted">Left out ${plan.dropped} exercise${plan.dropped === 1 ? '' : 's'} the AI made up.</p>` : ''}
     ${plan.days.map(d => `<h3>${esc(d.name)}</h3><ol class="group setlist">${d.items.map((it, i) =>
-      `<li><span>${esc(name(it.exId))}${it.ss || d.items[i - 1]?.ss ? ' <small class="pr">superset</small>' : ''}</span><span>${it.sets} × ${g.repMin}–${g.repMax}</span></li>`).join('')}</ol>`).join('')}
+      `<li><span>${esc(name(it.exId))}${it.ss || d.items[i - 1]?.ss ? ' <small class="pr">superset</small>' : ''}</span><span>${it.sets} × ${it.timed ? `${it.repMin}s` : `${g.repMin}–${g.repMax}`} · <small class="muted">rest ${clock((it.rest ?? g.rest) * 1000)}</small></span></li>`).join('')}</ol>`).join('')}
     <div class="group menu-list gap">
       <button data-m="save">Save as Routines</button>
       <button data-m="again">Change Answers</button>
@@ -132,7 +133,7 @@ function preview(plan, done) {
     if (m !== 'save') return;
     db.routines = db.routines.filter(r => !r.ai).concat(plan.days.map(d => ({
       id: uid(), ai: true, name: d.name,
-      items: d.items.map(it => ({ ...it, repMin: g.repMin, repMax: g.repMax, rest: g.rest })),
+      items: d.items.map(it => ({ ...it, repMin: it.timed ? it.repMin : g.repMin, repMax: it.timed ? it.repMax : g.repMax, rest: it.rest ?? g.rest })),
     })));
     save('routines');
     closeSheet();

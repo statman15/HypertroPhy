@@ -64,3 +64,14 @@ export function warmups(work, { bar = 0, round }) {
   }
   return sets;
 }
+
+// --- Timed holds (planks, carries, stretches): sets are seconds, not reps.
+export const TIME_RANGE = { repMin: 20, repMax: 60 }; // seconds
+
+// Next hold: 5 seconds longer than the shortest working set last time, never under the range's bottom.
+export function nextHold(history, { repMin }) {
+  const last = history.find(s => s.length);
+  if (!last) return null;
+  const top = Math.max(...last.map(s => +s.w || 0)), secs = last.filter(s => (+s.w || 0) === top).map(s => +s.r || 0);
+  return { w: top, r: Math.max(repMin, Math.min(...secs) + 5), kind: 'time' };
+}

@@ -249,7 +249,7 @@
   @keyframes breathe { to { opacity: .25; } }
   .composer { position: fixed; z-index: 3; left: 12px; right: 12px; bottom: calc(max(10px, calc(env(safe-area-inset-bottom) - var(--dock-gap))) + 72px); max-width: 560px; margin: 0 auto;
     display: flex; align-items: flex-end; gap: 6px; padding: 6px 6px 6px 16px; border-radius: 24px; box-shadow: 0 10px 30px var(--lift), inset 0 0 0 .5px var(--sep); }
-  body:has(#rest:not([hidden])) .composer { bottom: calc(max(10px, calc(env(safe-area-inset-bottom) - var(--dock-gap))) + 132px); }
+  body:has(#rest:not([hidden]), #hold:not([hidden])) .composer { bottom: calc(max(10px, calc(env(safe-area-inset-bottom) - var(--dock-gap))) + 132px); }
   .composer textarea { flex: 1; min-height: 36px; max-height: 120px; padding: 7px 0; border: 0; outline: 0; resize: none; background: none; font: inherit; color: var(--label); field-sizing: content; }
   .send { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; color: var(--on-tint); background: var(--tint); }
   .send:disabled { opacity: .4; }
@@ -259,6 +259,10 @@
   .sets abbr { text-decoration: none; }
   .setlist li.wu { counter-increment: none; color: var(--label2); }
   .setlist li.wu::before { content: 'W'; }
+  .timecell { white-space: nowrap; }
+  .timecell input { max-width: 52px; }
+  .hold-btn { width: 30px; height: 36px; margin-left: 4px; border-radius: 8px; background: var(--tint); color: var(--on-tint); font-size: 13px; text-align: center; vertical-align: middle; }
+  #hold .ic { width: 16px; height: 16px; }
   .mini-btn { height: 32px; padding: 0 10px; border-radius: 8px; background: var(--fill); color: var(--tint); font-size: 14px; font-weight: 600; }
   .plate-list { margin: 8px 0 0; padding: 4px 16px; list-style: none; font-variant-numeric: tabular-nums; }
   .plate-list li { display: grid; grid-template-columns: 28px 80px 1fr; gap: 8px; padding: 10px 0; }
@@ -345,6 +349,12 @@
   <span id="updateText"></span>
   <a id="updateGo" class="pill">Update</a>
   <button id="updateSkip" class="iconbtn" aria-label="Skip this version"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
+</div>
+
+<div id="hold" class="restbar glass" role="timer" aria-live="off" hidden>
+  <span>Hold <b id="holdLeft"></b></span>
+  <button class="skip" data-hold-done>Done</button>
+  <button aria-label="Cancel the hold"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
 </div>
 
 <div id="rest" class="restbar glass" role="timer" aria-live="off" hidden>

@@ -1,7 +1,12 @@
 // One OpenAI-compatible connection (OmniRoute, Gemini, or anything else that speaks /chat/completions).
 // Address, key and model live in settings.ai on this phone only.
 import { db } from './store.js';
-import { GOALS } from './progression.js';
+import { GOALS, TIME_RANGE } from './progression.js';
+import { isTimed } from './exercises.js';
+
+// Rest the AI picks per exercise, snapped to the app's rest-timer choices.
+const RESTS = [30, 45, 60, 90, 120, 180, 240, 300];
+export const snapRest = v => +v > 0 ? RESTS.reduce((a, b) => Math.abs(b - v) < Math.abs(a - v) ? b : a) : null;
 
 export const PRESETS = {
   omniroute: { label: 'OmniRoute', url: '', home: true, hint: 'Address: OmniRoute\'s Tailscale HTTPS address (works away from home with Tailscale on). Home address: its LAN address, tried first; works in the Android app, not the website.' },
@@ -89,16 +94,18 @@ export function planPrompt(list, p, about = '') {
   return [
     { role: 'system', content: 'You are an experienced strength coach. You build weekly training plans using ONLY exercise ids from the list you are given, copied exactly. Reply with JSON only, no other text.' },
     { role: 'user', content: `Build a weekly plan.
-Goal: ${g.label} (${g.repMin}-${g.repMax} reps, ${g.rest}s rest; the app sets reps and rest, you choose exercises and set counts).
+Goal: ${g.label} (${g.repMin}-${g.repMax} reps; the app sets reps, you choose exercises, set counts and rest).
 Training days per week: ${p.days}. Minutes per session: ${p.minutes} (about ${perDay} exercises a day).
 Experience: ${p.level}.${about ? `
 Person: ${about}.` : ''}${p.avoid ? `\nAvoid or work around: ${p.avoid}.` : ''}
 Rules: cover every major muscle group across the week; big compound lifts first in a day; 2-5 sets each;${p.goal === 'fatloss' ? ' pair exercises into supersets (set superset_with_next on the first of each pair);' : ''} name each day briefly (e.g. "Upper A", "Legs").
+Rest: give every exercise rest_seconds (30-300) suited to it and to this goal (typical for the goal: about ${g.rest}s). Heavy compound lifts need more (around 120-180 for strength work), isolation work and supersets less (around 45-75).
+Exercises marked "timed" are holds measured in seconds, not reps: give them "seconds" per set (e.g. 30-60) instead.
 Reply exactly in this shape:
-{"days":[{"name":"Upper A","exercises":[{"id":"<id from the list>","sets":3,"superset_with_next":false}]}],"notes":"2-3 sentences on how the week is split and how to progress"}
+{"days":[{"name":"Upper A","exercises":[{"id":"<id from the list>","sets":3,"rest_seconds":90,"superset_with_next":false},{"id":"<a timed id>","sets":3,"seconds":45,"rest_seconds":60,"superset_with_next":false}]}],"notes":"2-3 sentences on how the week is split and how to progress"}
 
-Exercises (id | primary muscle | equipment | mechanic):
-${list.map(e => `${e.id} | ${e.primaryMuscles[0] || ''} | ${e.equipment} | ${e.mechanic || ''}`).join('\n')}` },
+Exercises (id | primary muscle | equipment | mechanic | timed?):
+${list.map(e => `${e.id} | ${e.primaryMuscles[0] || ''} | ${e.equipment} | ${e.mechanic || ''}${isTimed(e) ? ' | timed' : ''}`).join('\n')}` },
   ];
 }
 
@@ -113,7 +120,12 @@ export function parsePlan(text, lib) {
     const items = (Array.isArray(d.exercises) ? d.exercises : []).flatMap(x => {
       const id = lib[x?.id] ? x.id : lower[String(x?.id ?? '').toLowerCase()];
       if (!id) { dropped++; return []; }
-      return [{ exId: id, sets: Math.max(1, Math.min(6, parseInt(x.sets) || 3)), ss: !!x.superset_with_next }];
+      const item = { exId: id, sets: Math.max(1, Math.min(6, parseInt(x.sets) || 3)), ss: !!x.superset_with_next, rest: snapRest(x.rest_seconds) };
+      if (isTimed(lib[id])) {
+        const s = Math.max(10, Math.min(600, parseInt(x.seconds) || TIME_RANGE.repMin));
+        Object.assign(item, { timed: true, repMin: s, repMax: s + 15 });
+      }
+      return [item];
     });
     if (items.length) items.at(-1).ss = false; // nothing after the last exercise to superset with
     return { name: String(d.name || 'Day').slice(0, 40), items };
