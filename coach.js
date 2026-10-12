@@ -1,6 +1,6 @@
 // The Coach tab (chat with your training as context) and the AI plan builder sheet.
 import { $, esc, num, day, icon, sheet, closeSheet } from './ui.js';
-import { db, save, uid } from './store.js';
+import { db, save, uid, aboutYou } from './store.js';
 import { GOALS } from './progression.js';
 import * as ai from './ai.js';
 const { chat, candidates, planPrompt, parsePlan, EQUIPMENT } = ai;
@@ -72,11 +72,13 @@ function context() {
   return [
     'You are a friendly, knowledgeable strength coach inside the HypertroPhy lifting app. Be concise (under 150 words unless asked for more), practical and safe. Plain text; short lists are fine. If something sounds like an injury, suggest seeing a professional.',
     `Weights are in ${u}. The app suggests weights by double progression: hit the top of the rep range on every set and it adds weight; miss the bottom twice at one weight and it deloads 10%.`,
+    aboutYou() ? `About them: ${aboutYou()}.` : 'Age, sex and size not given.',
+    db.body.weights.length > 1 ? `Recent body weight (${db.settings.units}), oldest first: ${db.body.weights.slice(-8).map(x => `${day(x.t)} ${num(x.w)}`).join(', ')}.` : '',
     p ? `Profile: goal ${g.label} (${g.repMin}-${g.repMax} reps), ${p.days} days a week, ${p.minutes} min sessions, ${p.level}, equipment: ${p.equipment.join(', ')}${p.avoid ? `; avoid: ${p.avoid}` : ''}.` : 'No profile set yet.',
     'Routines:', ...(db.routines.length ? db.routines.map(r => `- ${r.name}: ${r.items.map(it => `${name(it.exId)} ${it.sets}x${it.repMin}-${it.repMax}`).join(', ')}`) : ['- none']),
     'Workouts in the last 4 weeks, newest first:',
     ...(recent.length ? recent.map(w => `- ${day(w.start)} ${w.name}: ${w.items.map(it => `${name(it.exId)} ${it.sets.map(s => `${num(s.w)}x${s.r}`).join(' ')}`).join('; ')}`) : ['- none logged']),
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
 // --- Plan builder: a form, then a preview, then routines.
@@ -106,7 +108,7 @@ export function openPlanBuilder(done) {
     if (list.length < 15) return void ($('#planMsg').textContent = 'Tick more equipment: there aren\'t enough exercises to build a week from.');
     btn.disabled = true; btn.textContent = 'Building… this can take a minute';
     $('#planMsg').textContent = '';
-    try { const plan = parsePlan(await chat(planPrompt(list, db.profile)), lib); plan.via = ai.via === 'Gemini' ? 'Gemini' : ''; preview(plan, done); }
+    try { const plan = parsePlan(await chat(planPrompt(list, db.profile, aboutYou())), lib); plan.via = ai.via === 'Gemini' ? 'Gemini' : ''; preview(plan, done); }
     catch (e) { $('#planMsg').textContent = e.message; btn.disabled = false; btn.textContent = 'Build My Plan'; }
   };
 }

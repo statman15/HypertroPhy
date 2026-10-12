@@ -9,16 +9,21 @@ export const db = {
   active: read('active', null),   // the workout in progress, saved on every change so a closed app loses nothing
   profile: read('profile', null), // plan-builder answers: goal, days, minutes, level, equipment, avoid
   chat: read('chat', []),         // coach conversation, last 50 messages
+  // About you: sex '' | 'male' | 'female', birthYear, heightCm, and weigh-ins [{ t, w, src? }] oldest first (w in the current unit).
+  body: read('body', { sex: '', birthYear: '', heightCm: '', weights: [] }),
 };
 export const save = (...keys) => { for (const k of keys) localStorage.setItem(k, JSON.stringify(db[k])); };
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 // Epley estimated one-rep max.
 export const e1rm = (w, r) => (+w || 0) * (1 + (+r || 0) / 30);
-export const volume = items => items.reduce((t, it) => t + it.sets.reduce((s, x) => s + (+x.w || 0) * (+x.r || 0), 0), 0);
+// Warm-up sets (wu: true) never count toward volume, records, PRs or progression.
+export const working = sets => sets.filter(s => !s.wu);
+export const volume = items => items.reduce((t, it) => t + working(it.sets).reduce((s, x) => s + (+x.w || 0) * (+x.r || 0), 0), 0);
 
-// Sessions of one exercise, newest first: [{ date, sets }].
-export const sessions = exId => db.workouts.flatMap(w => w.items.filter(it => it.exId === exId).map(it => ({ date: w.start, sets: it.sets })));
+// Sessions of one exercise, newest first: [{ date, sets }], working sets only.
+export const sessions = exId => db.workouts.flatMap(w => w.items.filter(it => it.exId === exId)
+  .map(it => ({ date: w.start, sets: working(it.sets) })).filter(s => s.sets.length));
 export const lastSets = exId => sessions(exId)[0]?.sets || [];
 
 export function records(exId) {
@@ -39,21 +44,39 @@ export function setUnits(units) {
   const conv = w => w === '' || w == null ? w : Math.round(+w * f * step) / step;
   for (const w of [...db.workouts, ...(db.active ? [db.active] : [])])
     for (const it of w.items) for (const s of it.sets) s.w = conv(s.w);
+  for (const x of db.body.weights) x.w = conv(x.w);
+  delete db.settings.plates; // bar and plates differ per unit; the new unit starts from its defaults
   db.settings.units = units;
-  save('settings', 'workouts', 'active');
+  save('settings', 'workouts', 'active', 'body');
+}
+
+// --- About you.
+export const bodyweight = () => db.body.weights.at(-1)?.w || 0;
+export const age = () => db.body.birthYear ? new Date().getFullYear() - db.body.birthYear : null;
+export const toKg = w => db.settings.units === 'kg' ? w : w * 0.45359237;
+
+// Estimated calories for a workout: MET 5 (moderate-to-vigorous weight training) × kg × hours, capped at 3 hours.
+// ponytail: one MET for every workout; per-exercise METs or heart rate if the estimate ever matters.
+export const kcal = w => bodyweight() ? Math.round(5 * toKg(bodyweight()) * Math.min(3, (w.end - w.start) / 3.6e6)) : 0;
+
+// A line for the AI: "male, 34, 180 cm, 82 kg" (whatever is known).
+export function aboutYou() {
+  const b = db.body, parts = [b.sex, age() && `${age()} years old`, b.heightCm && `${b.heightCm} cm`, bodyweight() && `${Math.round(toKg(bodyweight()))} kg`].filter(Boolean);
+  return parts.join(', ');
 }
 
 // --- Backup. AI keys never go in the file: they stay on each phone, and restoring keeps this phone's AI setup.
 export function backup() {
   const settings = { ...db.settings };
   delete settings.ai;
-  return { app: 'HypertroPhy', format: 1, exported: Date.now(), settings, routines: db.routines, workouts: db.workouts, profile: db.profile, chat: db.chat };
+  return { app: 'HypertroPhy', format: 1, exported: Date.now(), settings, routines: db.routines, workouts: db.workouts, profile: db.profile, chat: db.chat, body: db.body };
 }
 
 // A backup file is outside input, and its ids and numbers end up in HTML attributes, so check every field that gets rendered.
 const id = v => typeof v === 'string' && /^[\w.-]{1,64}$/.test(v);
 const n = v => v === '' || Number.isFinite(+v);
 const item = it => id(it?.exId) && Array.isArray(it.sets) && it.sets.every(s => n(s?.w) && n(s?.r));
+// (body weigh-ins are checked field by field in restore)
 const routineItem = it => id(it?.exId) && [it.sets, it.repMin, it.repMax, it.rest].every(v => v == null || Number.isFinite(+v));
 
 export function restore(data) {
@@ -66,9 +89,16 @@ export function restore(data) {
   db.routines = data.routines.map(r => ({ ...r, name: String(r.name ?? 'Routine'), items: r.items.map(num) }));
   const p = data.profile;
   db.profile = p && ['strength', 'muscle', 'tone', 'fatloss'].includes(p.goal) && Array.isArray(p.equipment) ? p : null;
+  const b = data.body || {};
+  db.body = {
+    sex: ['male', 'female'].includes(b.sex) ? b.sex : '',
+    birthYear: Number.isInteger(+b.birthYear) && +b.birthYear > 1900 ? +b.birthYear : '',
+    heightCm: +b.heightCm > 0 && +b.heightCm < 300 ? +b.heightCm : '',
+    weights: Array.isArray(b.weights) ? b.weights.filter(x => Number.isFinite(x?.t) && +x.w > 0).map(x => ({ t: x.t, w: +x.w, ...(x.src === 'hc' && { src: 'hc' }) })) : [],
+  };
   db.chat = Array.isArray(data.chat) ? data.chat.filter(m => ['user', 'assistant'].includes(m?.role) && typeof m.content === 'string') : [];
   db.settings = { units: data.settings.units, ai: db.settings.ai, lastBackup: data.exported };
   db.active = null;
-  save('settings', 'routines', 'workouts', 'profile', 'chat', 'active');
+  save('settings', 'routines', 'workouts', 'profile', 'chat', 'active', 'body');
   return db.workouts.length;
 }

@@ -1,13 +1,20 @@
 // The Workout tab: routines when idle, the live logger during a workout, and the routine editor.
 import { $, esc, num, day, clock, icon, restOptions, sheet, closeSheet } from './ui.js';
-import { db, save, uid, lastSets, sessions, records, e1rm, volume } from './store.js';
-import { nextTarget, stepFor, DEFAULT_RANGE, GOALS } from './progression.js';
+import { db, save, uid, lastSets, sessions, records, e1rm, volume, bodyweight } from './store.js';
+import { nextTarget, stepFor, DEFAULT_RANGE, GOALS, plates, warmups, PLATE_DEFAULTS } from './progression.js';
+import { startGuess } from './guess.js';
 
 let lib, pick, onFinish, info, buildPlan, editing = null, lock = null, audio = null;
 const root = () => $('#workout');
 const name = id => lib[id]?.name || id;
 const blankSets = n => Array.from({ length: n }, () => ({ w: '', r: '' }));
 const parse = v => parseFloat(String(v).replace(',', '.'));
+const WEIGHTED = ['barbell', 'dumbbell', 'machine', 'cable', 'kettlebells', 'e-z curl bar'];
+const kit = () => db.settings.plates || PLATE_DEFAULTS[db.settings.units];
+// Rounding step for suggested weights: barbells can only change by two of the smallest plate you own.
+const roundFor = ex => ex.equipment === 'barbell' && kit().have.length ? Math.max(stepFor(ex, db.settings.units).round, 2 * Math.min(...kit().have)) : stepFor(ex, db.settings.units).round;
+// Set j's position among the working sets (warm-ups don't take a number or shift "Previous").
+const workIdx = (it, j) => it.sets.slice(0, j).filter(s => !s.wu).length;
 
 // Android app only: the rest timer is also a system notification, so it buzzes with the phone locked.
 const notes = window.Capacitor?.isNativePlatform?.() && window.Capacitor.Plugins.LocalNotifications;
@@ -74,12 +81,13 @@ function activeHtml() {
       <div class="ex-head"><button class="ex-name" data-act="info" data-i="${i}">${esc(name(it.exId))}</button>
         <button class="iconbtn" data-act="menu" data-i="${i}" aria-label="Exercise options">${icon('dots')}</button></div>
       <div class="ex-sub">${targetHtml(it)}
+        ${lib[it.exId]?.equipment === 'barbell' ? `<button class="mini-btn" data-act="plates" data-i="${i}">Plates</button>` : ''}
         <label class="mini"><span class="visually-hidden">Rest timer</span><select data-rest="${i}">${restOptions(it.rest)}</select></label></div>
       <table class="sets"><thead><tr><th>Set</th><th>Previous</th><th>${u}</th><th>Reps</th><th><span class="visually-hidden">Done</span></th></tr></thead><tbody>
-      ${it.sets.map((s, j) => { const p = prevSet(it, j); return `<tr${s.done ? ' class="done"' : ''}>
-        <td>${j + 1}</td><td class="prev">${p ? `${num(p.w)}×${p.r}` : '–'}</td>
-        <td><input inputmode="decimal" data-i="${i}" data-j="${j}" data-f="w" value="${esc(s.w)}" placeholder="${hint(it, j) ? num(hint(it, j).w) : ''}" aria-label="Set ${j + 1} weight"></td>
-        <td><input inputmode="numeric" data-i="${i}" data-j="${j}" data-f="r" value="${esc(s.r)}" placeholder="${hint(it, j)?.r ?? range(it).repMax}" aria-label="Set ${j + 1} reps"></td>
+      ${it.sets.map((s, j) => { const k = workIdx(it, j), p = s.wu ? null : prevSet(it, k); return `<tr class="${s.done ? 'done' : ''}${s.wu ? ' wu' : ''}">
+        <td>${s.wu ? '<abbr title="Warm-up">W</abbr>' : k + 1}</td><td class="prev">${p ? `${num(p.w)}×${p.r}` : '–'}</td>
+        <td><input inputmode="decimal" data-i="${i}" data-j="${j}" data-f="w" value="${esc(s.w)}" placeholder="${s.wu ? '' : hint(it, workIdx(it, j)) ? num(hint(it, workIdx(it, j)).w) : ''}" aria-label="Set ${j + 1} weight"></td>
+        <td><input inputmode="numeric" data-i="${i}" data-j="${j}" data-f="r" value="${esc(s.r)}" placeholder="${s.wu ? '' : hint(it, workIdx(it, j))?.r ?? range(it).repMax}" aria-label="Set ${j + 1} reps"></td>
         <td><button class="check" data-act="check" data-i="${i}" data-j="${j}" aria-pressed="${!!s.done}" aria-label="Set ${j + 1} done">${icon('check')}</button></td>
       </tr>`; }).join('')}
       </tbody></table>
@@ -115,16 +123,24 @@ const linkBtn = (it, i) => `<button class="link${it.ss ? ' on' : ''}" data-act="
 function prevSet(it, j) { const p = lastSets(it.exId); return p[j] || p.at(-1); }
 
 const range = it => it.repMin ? it : GOALS[db.profile?.goal] || DEFAULT_RANGE;
-const target = it => nextTarget(sessions(it.exId).map(s => s.sets), { ...range(it), ...stepFor(lib[it.exId], db.settings.units) });
-// What an empty box means: today's target, else last time's set.
-const hint = (it, j) => target(it) || prevSet(it, j);
+const target = it => { const ex = lib[it.exId], st = stepFor(ex, db.settings.units); return nextTarget(sessions(it.exId).map(s => s.sets), { ...range(it), ...st, step: Math.max(st.step, ex ? roundFor(ex) : 0) }); };
+// A first-time exercise gets a starting guess from bodyweight, sex and experience (needs About You filled in).
+const guess = it => {
+  const ex = lib[it.exId];
+  if (!ex || lastSets(it.exId).length) return null;
+  const w = startGuess(ex, { bodyweight: bodyweight(), sex: db.body.sex, level: db.profile?.level, round: roundFor(ex), bar: kit().bar });
+  return w ? { w, r: range(it).repMax, kind: 'guess' } : null;
+};
+// What an empty box means: today's target, else last time's set, else the starting guess.
+const hint = (it, j) => target(it) || prevSet(it, j) || guess(it);
 
 function targetHtml(it) {
-  const t = target(it), u = db.settings.units, { repMin, repMax } = range(it);
+  const t = target(it) || guess(it), u = db.settings.units, { repMin, repMax } = range(it);
   const text = !t ? `${repMin}–${repMax} reps`
     : t.kind === 'up' ? `Go up: ${num(t.w)} ${u} × ${t.r}`
     : t.kind === 'deload' ? `Deload: ${num(t.w)} ${u} × ${t.r}`
     : t.kind === 'reps' ? `Target: ${t.r} reps`
+    : t.kind === 'guess' ? `Starting guess: ${num(t.w)} ${u}`
     : `Target: ${num(t.w)} ${u} × ${t.r}`;
   return `<span class="target ${t?.kind || ''}">${text}</span>${t ? `<span>${repMin}–${repMax}</span>` : ''}`;
 }
@@ -147,6 +163,7 @@ function onClick(ev) {
     case 'plan': return buildPlan(render);
     case 'info': return info(a.items[i].exId);
     case 'menu': return menu(i);
+    case 'plates': return showPlates(a.items[i]);
     case 'ss': t.items[i].ss = !t.items[i].ss; break;
     case 'addset': a.items[i].sets.push({ w: '', r: '' }); break;
     case 'check': if (!check(i, +b.dataset.j)) return; break;
@@ -198,7 +215,7 @@ function saveRoutine() {
 export function routineFrom(w) {
   db.routines.push({
     id: uid(), name: w.name === 'Workout' ? `Workout ${day(w.start)}` : w.name,
-    items: w.items.map(it => ({ exId: it.exId, sets: it.sets.length, repMin: it.repMin || 8, repMax: it.repMax || 12, rest: it.rest ?? 90, ss: it.ss })),
+    items: w.items.map(it => ({ exId: it.exId, sets: it.sets.filter(s => !s.wu).length, repMin: it.repMin || 8, repMax: it.repMax || 12, rest: it.rest ?? 90, ss: it.ss })),
   });
   save('routines');
 }
@@ -207,6 +224,7 @@ function menu(i) {
   const t = editing || db.active, it = t.items[i];
   const body = sheet(`<h2>${esc(name(it.exId))}</h2><div class="group menu-list">
     ${i > 0 ? '<button data-m="up">Move Up</button>' : ''}
+    ${!editing && WEIGHTED.includes(lib[it.exId]?.equipment) ? '<button data-m="warm">Add Warm-up Sets</button>' : ''}
     ${!editing && it.sets.length > 1 ? '<button data-m="pop">Remove Last Set</button>' : ''}
     <button data-m="swap">Replace Exercise</button>
     <button data-m="del" class="danger">Remove Exercise</button></div>`);
@@ -217,19 +235,44 @@ function menu(i) {
     if (m === 'swap') return pick(ex => { it.exId = ex.id; if (!editing) save('active'); }, { muscle: lib[it.exId]?.primaryMuscles[0] });
     if (m === 'up') t.items.splice(i - 1, 0, ...t.items.splice(i, 1));
     if (m === 'pop') it.sets.pop();
+    if (m === 'warm') addWarmups(it);
     if (m === 'del') t.items.splice(i, 1);
     if (!editing) save('active');
     render();
   };
 }
 
+// Ramp-up sets for today's working weight (typed, else the target/last time/guess), replacing any already added.
+function addWarmups(it) {
+  const ex = lib[it.exId], first = it.sets.find(s => !s.wu);
+  const work = first && first.w !== '' ? parse(first.w) : +(hint(it, 0)?.w || 0);
+  if (!(work > 0)) return alert('Enter the working weight for this exercise first, then add warm-ups.');
+  const sets = warmups(work, { bar: ex.equipment === 'barbell' ? kit().bar : 0, round: roundFor(ex) });
+  if (!sets.length) return alert('This weight is light enough to skip warm-ups.');
+  it.sets = [...sets.map(s => ({ ...s, wu: true })), ...it.sets.filter(s => !s.wu)];
+}
+
+// Plates per side for each set of a barbell exercise: typed weight, else the placeholder.
+function showPlates(it) {
+  const { bar, have } = kit(), u = db.settings.units;
+  const rows = it.sets.map((s, j) => {
+    const w = s.w !== '' ? parse(s.w) : s.wu ? 0 : +(hint(it, workIdx(it, j))?.w || 0);
+    if (!(w > 0)) return '';
+    const p = plates(w, bar, have);
+    const how = p.under ? `under the ${num(bar)} ${u} bar` : p.side.length ? p.side.map(num).join(' + ') : 'empty bar';
+    return `<li><span>${s.wu ? 'W' : workIdx(it, j) + 1}</span><b>${num(w)} ${u}</b><span>${how}${p.left ? ` <small class="pr">(+${num(p.left * 2)} ${u} short)</small>` : ''}</span></li>`;
+  }).join('');
+  sheet(`<h2 id="sheetTitle">Plates per side</h2><p class="muted">${num(bar)} ${u} bar. Change the bar and plates you have in Settings.</p>
+    <ol class="group plate-list">${rows || '<li>Enter a weight first.</li>'}</ol>`);
+}
+
 // Fills blanks from the placeholders (today's target or last time's numbers), so hitting the target is one tap.
 function check(i, j) {
   const it = db.active.items[i], s = it.sets[j];
   if (s.done) return !(s.done = false);
-  const p = hint(it, j);
-  const bodyweight = ['body only', 'none'].includes(lib[it.exId]?.equipment);
-  const w = s.w !== '' ? parse(s.w) : p ? +p.w : bodyweight ? 0 : NaN;
+  const p = s.wu ? null : hint(it, workIdx(it, j));
+  const noWeight = ['body only', 'none'].includes(lib[it.exId]?.equipment);
+  const w = s.w !== '' ? parse(s.w) : p ? +p.w : noWeight ? 0 : NaN;
   const r = s.r === '' ? +(p?.r ?? range(it).repMax) : parseInt(s.r);
   if (!(r > 0) || isNaN(w)) {
     root().querySelector(`[data-i="${i}"][data-j="${j}"][data-f="${isNaN(w) ? 'w' : 'r'}"]`)?.focus();
@@ -238,14 +281,14 @@ function check(i, j) {
   Object.assign(s, { w, r, done: true });
   audio ||= new (window.AudioContext || window.webkitAudioContext)(); // must be created on a tap for iOS to allow sound
   audio.resume();
-  if (!it.ss && it.rest) db.active.restEnd = Date.now() + it.rest * 1000;
+  if (!it.ss && it.rest && !s.wu) db.active.restEnd = Date.now() + it.rest * 1000;
   return true;
 }
 
 function finish() {
   const a = db.active;
   const items = a.items
-    .map(it => ({ exId: it.exId, rest: it.rest, ss: it.ss, repMin: it.repMin, repMax: it.repMax, sets: it.sets.filter(s => s.done).map(s => ({ w: s.w, r: s.r })) }))
+    .map(it => ({ exId: it.exId, rest: it.rest, ss: it.ss, repMin: it.repMin, repMax: it.repMax, sets: it.sets.filter(s => s.done).map(s => ({ w: s.w, r: s.r, ...(s.wu && { wu: true }) })) }))
     .filter(it => it.sets.length);
   if (!items.length) {
     if (!confirm('No sets are checked off. Discard this workout?')) return;
@@ -254,7 +297,7 @@ function finish() {
   // A PR is a set whose estimated 1RM beats everything logged before it (needs earlier history to count).
   for (const it of items) {
     let best = records(it.exId)?.best;
-    if (best) for (const s of it.sets) if (e1rm(s.w, s.r) > best) { s.pr = true; best = e1rm(s.w, s.r); }
+    if (best) for (const s of it.sets) if (!s.wu && e1rm(s.w, s.r) > best) { s.pr = true; best = e1rm(s.w, s.r); }
   }
   const w = { id: a.id, name: a.name, routineId: a.routineId, start: a.start, end: Date.now(), items };
   db.workouts.unshift(w);

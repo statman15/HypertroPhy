@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 const mem = new Map();
 globalThis.localStorage = { getItem: k => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, String(v)) };
-const { db, backup, restore } = await import('./store.js');
+const { db, backup, restore, volume, sessions, setUnits, kcal } = await import('./store.js');
 
 db.settings = { units: 'lb', ai: { preset: 'gemini', gemini: { url: 'x', key: 'SECRET', model: 'm' } } };
 db.workouts = [{ id: 'w1', name: 'Push', start: 1, end: 2, items: [{ exId: 'Pullups', sets: [{ w: 0, r: 8 }] }] }];
@@ -28,5 +28,22 @@ const strings = structuredClone(file);
 strings.workouts[0].items[0].sets[0] = { w: '135', r: '10' };
 restore(strings);
 assert.deepEqual(db.workouts[0].items[0].sets[0], { w: 135, r: 10 }, 'numeric strings are turned into numbers');
+
+// Warm-ups count for nothing
+const items = [{ exId: 'Barbell_Squat', sets: [{ w: 45, r: 10, wu: true }, { w: 135, r: 5 }] }];
+assert.equal(volume(items), 675, 'warm-up sets are left out of volume');
+db.workouts = [{ id: 'w2', name: 'Legs', start: 0, end: 3.6e6, items }];
+assert.deepEqual(sessions('Barbell_Squat')[0].sets, [{ w: 135, r: 5 }], 'and out of history used by progression and records');
+
+// Body data: kept in backups, checked on restore, converted with units, used for calories
+db.settings = { units: 'lb', ai: {} };
+db.body = { sex: 'male', birthYear: 1990, heightCm: 180, weights: [{ t: 1, w: 198.4 }] };
+assert.equal(kcal(db.workouts[0]), 450, 'MET 5 × 90 kg × 1 h');
+const withBody = JSON.parse(JSON.stringify(backup()));
+withBody.body.sex = '<script>'; withBody.body.weights.push({ t: 'x', w: 5 }, { t: 2, w: -1 });
+restore(withBody);
+assert.deepEqual(db.body, { sex: '', birthYear: 1990, heightCm: 180, weights: [{ t: 1, w: 198.4 }] }, 'bad body fields are dropped');
+setUnits('kg');
+assert.equal(db.body.weights[0].w, 90, 'weigh-ins convert with the units');
 
 console.log('store: all checks pass');

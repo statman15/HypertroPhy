@@ -4,7 +4,7 @@
   "type": "module",
   "description": "npm is only for the Capacitor Android shell; the web app itself has no build step.",
   "scripts": {
-    "test": "node progression.test.js && node ai.test.js && node store.test.js",
+    "test": "node progression.test.js && node ai.test.js && node store.test.js && node guess.test.js",
     "www": "node copy-web.js",
     "sync": "node copy-web.js && cap sync android"
   },
@@ -13,7 +13,8 @@
     "@capacitor/core": "8.5.3",
     "@capacitor/filesystem": "^8.1.4",
     "@capacitor/local-notifications": "8.3.1",
-    "@capacitor/share": "^8.0.3"
+    "@capacitor/share": "^8.0.3",
+    "@capgo/capacitor-health": "^8.11.10"
   },
   "devDependencies": {
     "@capacitor/cli": "8.5.3"

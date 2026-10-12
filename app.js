@@ -1,5 +1,6 @@
 import { $, esc, day, sheet } from './ui.js';
 import { db, save, setUnits, backup, restore } from './store.js';
+import { PLATE_DEFAULTS } from './progression.js';
 import { load, filter, values, photo, cap } from './exercises.js';
 import * as workout from './workout.js';
 import * as history from './history.js';
@@ -105,12 +106,29 @@ function renderSettings() {
   const ai = db.settings.ai ||= { preset: 'omniroute' };
   for (const k in PRESETS) ai[k] ||= { url: PRESETS[k].url, key: '', model: '' };
   const c = conn();
+  const kit = db.settings.plates || PLATE_DEFAULTS[db.settings.units];
   $('#settings').innerHTML = `<div class="head"><h1>Settings</h1></div>
   <div class="pad">
     <h3 class="label">Units</h3>
     <div class="seg" role="radiogroup" aria-label="Units">${['lb', 'kg'].map(u =>
       `<button role="radio" data-units="${u}" aria-checked="${db.settings.units === u}">${u}</button>`).join('')}</div>
     <p class="muted">Switching converts every weight you've logged.</p>
+
+    <h3 class="label">About You</h3>
+    <div class="seg" role="radiogroup" aria-label="Sex">${[['male', 'Male'], ['female', 'Female'], ['', 'Not set']].map(([v, l]) =>
+      `<button role="radio" data-sex="${v}" aria-checked="${db.body.sex === v}">${l}</button>`).join('')}</div>
+    <div class="group form-rows">
+      <label>Born<input data-body="birthYear" inputmode="numeric" value="${esc(db.body.birthYear)}" placeholder="Year, e.g. 1990" autocomplete="off"></label>
+      ${db.settings.units === 'kg'
+        ? `<label>Height<input data-body="cm" inputmode="numeric" value="${db.body.heightCm ? Math.round(db.body.heightCm) : ''}" placeholder="cm"></label>`
+        : `<label>Height<span class="ftin"><input data-body="ft" inputmode="numeric" value="${db.body.heightCm ? Math.floor(db.body.heightCm / 30.48) : ''}" placeholder="ft" aria-label="Feet"><input data-body="in" inputmode="numeric" value="${db.body.heightCm ? Math.round(db.body.heightCm / 2.54 % 12) : ''}" placeholder="in" aria-label="Inches"></span></label>`}
+    </div>
+    <p class="muted">Used for AI plans and the coach, starting-weight guesses for new exercises, and calorie estimates. Log body weight on the History tab.</p>
+
+    <h3 class="label">Bar &amp; Plates</h3>
+    <div class="group form-rows"><label>Bar (${db.settings.units})<input data-bar inputmode="decimal" value="${kit.bar}"></label></div>
+    <div class="checks plates-have" aria-label="Plates you have">${PLATE_DEFAULTS[db.settings.units].have.map(p =>
+      `<label><input type="checkbox" data-plate value="${p}"${kit.have.includes(p) ? ' checked' : ''}>${p}</label>`).join('')}</div>
 
     <h3 class="label">AI Coach</h3>
     <div class="seg" role="radiogroup" aria-label="AI service">${Object.entries(PRESETS).map(([k, p]) =>
@@ -137,9 +155,10 @@ ${PRESETS[ai.preset].home ? `<label>Home address<input data-ai="home" value="${e
   </div>`;
 }
 $('#settings').addEventListener('click', async ev => {
-  const b = ev.target.closest('[data-units], [data-preset], [data-test]');
+  const b = ev.target.closest('[data-units], [data-preset], [data-test], [data-sex]');
   if (!b) return;
   if (b.dataset.units) { setUnits(b.dataset.units); return renderSettings(); }
+  if (b.dataset.sex != null) { db.body.sex = b.dataset.sex; save('body'); return renderSettings(); }
   if (b.dataset.preset) { db.settings.ai.preset = b.dataset.preset; save('settings'); return renderSettings(); }
   // Test: fetch the model list (kept, so Model becomes a dropdown), pick one if none is set, then ask for a one-word reply.
   const say = t => { $('#aiMsg').textContent = t; };
@@ -171,7 +190,19 @@ $('#settings').addEventListener('change', async ev => {
   } catch (e) { $('#backupMsg').textContent = e instanceof SyntaxError ? 'That file isn\'t a HypertroPhy backup.' : e.message; }
 });
 $('#settings').addEventListener('input', ev => {
-  const f = ev.target.dataset.ai;
+  const d = ev.target.dataset, v = ev.target.value.trim();
+  if (d.body === 'birthYear') { const y = parseInt(v); db.body.birthYear = y > 1900 && y <= new Date().getFullYear() ? y : ''; save('body'); return; }
+  if (d.body === 'cm') { db.body.heightCm = +v > 0 && +v < 300 ? +v : ''; save('body'); return; }
+  if (d.body === 'ft' || d.body === 'in') {
+    const ft = +$('[data-body=ft]').value || 0, inch = +$('[data-body=in]').value || 0, cm = Math.round((ft * 12 + inch) * 2.54);
+    db.body.heightCm = cm > 0 && cm < 300 ? cm : ''; save('body'); return;
+  }
+  if ('bar' in d || 'plate' in d) {
+    const bar = parseFloat($('[data-bar]').value.replace(',', '.'));
+    db.settings.plates = { bar: bar >= 0 ? bar : PLATE_DEFAULTS[db.settings.units].bar, have: [...document.querySelectorAll('[data-plate]:checked')].map(c => +c.value) };
+    save('settings'); return;
+  }
+  const f = d.ai;
   if (f) { conn()[f] = ev.target.value.trim(); save('settings'); }
 });
 

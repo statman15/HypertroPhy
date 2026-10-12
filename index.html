@@ -254,6 +254,28 @@
   .send { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; color: var(--on-tint); background: var(--tint); }
   .send:disabled { opacity: .4; }
   .send .ic { width: 18px; height: 18px; }
+  /* Warm-up sets: a W instead of a number, quieter than working sets. */
+  .sets tr.wu td:first-child, .sets tr.wu input { color: var(--label2); }
+  .sets abbr { text-decoration: none; }
+  .setlist li.wu { counter-increment: none; color: var(--label2); }
+  .setlist li.wu::before { content: 'W'; }
+  .mini-btn { height: 32px; padding: 0 10px; border-radius: 8px; background: var(--fill); color: var(--tint); font-size: 14px; font-weight: 600; }
+  .plate-list { margin: 8px 0 0; padding: 4px 16px; list-style: none; font-variant-numeric: tabular-nums; }
+  .plate-list li { display: grid; grid-template-columns: 28px 80px 1fr; gap: 8px; padding: 10px 0; }
+  .plate-list li + li { box-shadow: inset 0 .5px 0 var(--sep); }
+  .plate-list li span:first-child { color: var(--label2); font-weight: 600; }
+
+  /* Body weight card: the chart sits flat inside it. */
+  .body-card .chart { margin: 4px -8px 0; padding: 0; background: none; }
+  .setlist.plain { counter-reset: none; }
+  .setlist.plain li::before { content: none; }
+  .setlist.plain li { align-items: center; gap: 8px; padding: 4px 0; }
+  .setlist.plain li span { flex: 1; }
+  .setlist.plain .iconbtn { margin-right: -12px; }
+  .ftin { display: flex; gap: 8px; }
+  .ftin input { width: 4em; }
+  .plates-have { margin-top: 8px; }
+  .plates-have label { background: var(--fill); }
   .menu-list { margin-top: 8px; }
   .menu-list.gap { margin-top: 24px; }
   .menu-list button { display: block; width: 100%; min-height: 50px; padding: 0 16px; font-weight: 500; }

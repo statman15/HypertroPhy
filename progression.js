@@ -40,3 +40,27 @@ export function nextTarget(history, { repMin, repMax, step, round }) {
     return { w: Math.max(round, Math.round(last.top * 0.9 / round) * round), r: repMin, kind: 'deload' };
   return { w: last.top, r: repMin, kind: 'hold' };
 }
+
+// --- Plates and warm-ups (pure).
+export const PLATE_DEFAULTS = { lb: { bar: 45, have: [45, 35, 25, 10, 5, 2.5] }, kg: { bar: 20, have: [25, 20, 15, 10, 5, 2.5, 1.25] } };
+
+// Plates for one side of the bar, biggest first. `left` is what couldn't be made with the plates on hand.
+export function plates(total, bar, have) {
+  let side = Math.round((total - bar) / 2 * 1000) / 1000;
+  if (side < 0) return { side: [], left: 0, under: true };
+  const out = [];
+  for (const p of [...have].sort((a, b) => b - a)) while (side >= p - 1e-9) { out.push(p); side = Math.round((side - p) * 1000) / 1000; }
+  return { side: out, left: side };
+}
+
+// Ramp-up sets before the working weight: empty bar (barbells), then 50% × 8, 70% × 5, 85% × 3, rounded down to the plate step.
+// Skips any that would be at or under the previous one, so light working weights get fewer warm-ups.
+export function warmups(work, { bar = 0, round }) {
+  const down = w => bar + Math.floor((w - bar) / round) * round; // bar + whole plate pairs
+  const sets = bar && work > bar * 1.5 ? [{ w: bar, r: 10 }] : [];
+  for (const [pct, r] of [[0.5, 8], [0.7, 5], [0.85, 3]]) {
+    const w = Math.max(down(work * pct), bar);
+    if (w < work && w > (sets.at(-1)?.w ?? 0)) sets.push({ w, r });
+  }
+  return sets;
+}

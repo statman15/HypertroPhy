@@ -84,14 +84,15 @@ export function candidates(all, p) {
     && LEVELS.indexOf(e.level) <= LEVELS.indexOf(p.level));
 }
 
-export function planPrompt(list, p) {
+export function planPrompt(list, p, about = '') {
   const g = GOALS[p.goal], perDay = Math.max(3, Math.min(9, Math.round(p.minutes / 9)));
   return [
     { role: 'system', content: 'You are an experienced strength coach. You build weekly training plans using ONLY exercise ids from the list you are given, copied exactly. Reply with JSON only, no other text.' },
     { role: 'user', content: `Build a weekly plan.
 Goal: ${g.label} (${g.repMin}-${g.repMax} reps, ${g.rest}s rest; the app sets reps and rest, you choose exercises and set counts).
 Training days per week: ${p.days}. Minutes per session: ${p.minutes} (about ${perDay} exercises a day).
-Experience: ${p.level}.${p.avoid ? `\nAvoid or work around: ${p.avoid}.` : ''}
+Experience: ${p.level}.${about ? `
+Person: ${about}.` : ''}${p.avoid ? `\nAvoid or work around: ${p.avoid}.` : ''}
 Rules: cover every major muscle group across the week; big compound lifts first in a day; 2-5 sets each;${p.goal === 'fatloss' ? ' pair exercises into supersets (set superset_with_next on the first of each pair);' : ''} name each day briefly (e.g. "Upper A", "Legs").
 Reply exactly in this shape:
 {"days":[{"name":"Upper A","exercises":[{"id":"<id from the list>","sets":3,"superset_with_next":false}]}],"notes":"2-3 sentences on how the week is split and how to progress"}
