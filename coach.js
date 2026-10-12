@@ -2,7 +2,8 @@
 import { $, esc, num, day, icon, sheet, closeSheet } from './ui.js';
 import { db, save, uid } from './store.js';
 import { GOALS } from './progression.js';
-import { chat, candidates, planPrompt, parsePlan, EQUIPMENT } from './ai.js';
+import * as ai from './ai.js';
+const { chat, candidates, planPrompt, parsePlan, EQUIPMENT } = ai;
 import { cap } from './exercises.js';
 
 let all, lib, busy = false, error = '';
@@ -36,7 +37,7 @@ export function render() {
     ${db.chat.length ? '' : `<p class="muted">Ask about your training. The coach sees your goal, your routines and the last 4 weeks of workouts.</p>
       <div class="suggest">${SUGGESTIONS.map(s => `<button data-ask="${esc(s)}">${esc(s)}</button>`).join('')}</div>
       <button class="pill wide" data-act="plan">${icon('sparkle')}Build a Plan with AI</button>`}
-    ${db.chat.map(m => `<div class="msg ${m.role}">${fmt(m.content)}</div>`).join('')}
+    ${db.chat.map(m => `<div class="msg ${m.role}">${fmt(m.content)}</div>${m.via ? `<small class="via">Answered by ${m.via}: your main AI service couldn't be reached</small>` : ''}`).join('')}
     ${busy ? '<div class="msg assistant typing" aria-label="Coach is typing"><i></i><i></i><i></i></div>' : ''}
     ${error ? `<div class="msg error" role="alert">${esc(error)}</div>` : ''}
   </div>
@@ -56,7 +57,8 @@ async function send(q) {
   busy = true; error = '';
   render();
   try {
-    db.chat.push({ role: 'assistant', content: await chat([{ role: 'system', content: context() }, ...db.chat.slice(-20)]) });
+    const content = await chat([{ role: 'system', content: context() }, ...db.chat.slice(-20).map(({ role, content }) => ({ role, content }))]);
+    db.chat.push({ role: 'assistant', content, ...(ai.via === 'Gemini' && { via: 'Gemini' }) });
     save('chat');
   } catch (e) { error = e.message; }
   busy = false;
@@ -104,7 +106,7 @@ export function openPlanBuilder(done) {
     if (list.length < 15) return void ($('#planMsg').textContent = 'Tick more equipment: there aren\'t enough exercises to build a week from.');
     btn.disabled = true; btn.textContent = 'Building… this can take a minute';
     $('#planMsg').textContent = '';
-    try { preview(parsePlan(await chat(planPrompt(list, db.profile)), lib), done); }
+    try { const plan = parsePlan(await chat(planPrompt(list, db.profile)), lib); plan.via = ai.via === 'Gemini' ? 'Gemini' : ''; preview(plan, done); }
     catch (e) { $('#planMsg').textContent = e.message; btn.disabled = false; btn.textContent = 'Build My Plan'; }
   };
 }
@@ -113,6 +115,7 @@ function preview(plan, done) {
   const g = GOALS[db.profile.goal];
   const body = sheet(`<h2 id="sheetTitle">Your Plan</h2>
     <p class="muted">${esc(plan.notes)}</p>
+    ${plan.via ? `<p class="muted">Built by ${plan.via}: your main AI service couldn't be reached.</p>` : ''}
     ${plan.dropped ? `<p class="muted">Left out ${plan.dropped} exercise${plan.dropped === 1 ? '' : 's'} the AI made up.</p>` : ''}
     ${plan.days.map(d => `<h3>${esc(d.name)}</h3><ol class="group setlist">${d.items.map((it, i) =>
       `<li><span>${esc(name(it.exId))}${it.ss || d.items[i - 1]?.ss ? ' <small class="pr">superset</small>' : ''}</span><span>${it.sets} × ${g.repMin}–${g.repMax}</span></li>`).join('')}</ol>`).join('')}

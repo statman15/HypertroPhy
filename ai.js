@@ -4,43 +4,69 @@ import { db } from './store.js';
 import { GOALS } from './progression.js';
 
 export const PRESETS = {
-  omniroute: { label: 'OmniRoute', url: '', hint: 'OmniRoute\'s HTTPS address from Tailscale Serve, ending in /v1. This phone must be on Tailscale.' },
+  omniroute: { label: 'OmniRoute', url: '', home: true, hint: 'Address: OmniRoute\'s Tailscale HTTPS address (works away from home with Tailscale on). Home address: its LAN address, tried first; works in the Android app, not the website.' },
   gemini: { label: 'Gemini', url: 'https://generativelanguage.googleapis.com/v1beta/openai', hint: 'Free key from aistudio.google.com → Get API key.' },
-  other: { label: 'Other', url: '', hint: 'Any OpenAI-compatible address, ending in /v1.' },
+  other: { label: 'Other', url: '', home: true, hint: 'Any OpenAI-compatible address, ending in /v1.' },
 };
 
-// settings.ai = { preset, omniroute: {url,key,model}, gemini: {...}, other: {...} }: switching services keeps each one's key.
+// settings.ai = { preset, omniroute: {url,home,key,model}, gemini: {...}, other: {...} }: switching services keeps each one's key.
 export const conn = () => { const a = db.settings.ai; return a?.[a.preset] || {}; };
 
 const host = url => { try { return new URL(url).host; } catch { return url; } };
 // A bare address (https://host:port) means the usual /v1; Gemini's longer path is left alone.
 const base = url => { const u = url.trim().replace(/\/+$/, ''); try { return new URL(u).pathname === '/' ? u + '/v1' : u; } catch { return u; } };
 
-async function call(path, body) {
-  const { url, key } = conn();
-  if (!url || !key) throw new Error('Set up the AI connection in Settings first.');
+// With a home address, use it when it answers within 2.5 s (any reply, even 401, means it's reachable), else the main address.
+// The answer is remembered for a minute so each message doesn't re-probe. On the website an http home address fails instantly.
+let picked = { at: 0, key: '', url: '' };
+async function address(c) {
+  if (!c.home) return c.url;
+  const key = c.home + c.url;
+  if (picked.key === key && Date.now() - picked.at < 60000) return picked.url;
+  let url = c.url;
+  try { await fetch(base(c.home) + '/models', { headers: { Authorization: `Bearer ${c.key}` }, signal: AbortSignal.timeout(2500) }); url = c.home; } catch {}
+  picked = { at: Date.now(), key, url };
+  return url;
+}
+
+// Which address answered the last request: '' (the main one), 'home', or 'Gemini' (fallback).
+export let via = '';
+
+async function call(path, body, c = conn()) {
+  if (!(c.url || c.home) || !c.key) throw new Error('Set up the AI connection in Settings first.');
+  const url = await address(c);
   let res;
   try {
     res = await fetch(base(url) + path, {
       method: body ? 'POST' : 'GET',
-      headers: { Authorization: `Bearer ${key}`, ...(body && { 'Content-Type': 'application/json' }) },
+      headers: { Authorization: `Bearer ${c.key}`, ...(body && { 'Content-Type': 'application/json' }) },
       body: body && JSON.stringify(body),
       signal: AbortSignal.timeout(120000),
     });
   } catch (e) {
-    throw new Error(e.name === 'TimeoutError' ? 'The AI took too long to answer. Try again.'
-      : `Couldn't reach ${host(url)}. Check the address (it must start with https://), and for OmniRoute that this phone is on Tailscale.`);
+    if (e.name === 'TimeoutError') throw new Error('The AI took too long to answer. Try again.');
+    picked.at = 0; // look for the home address again next time
+    throw Object.assign(new Error(`Couldn't reach ${host(url)}. Check the address (it must start with https://), and for a Tailscale address that Tailscale is on.`), { unreachable: true });
   }
   if (res.status === 401 || res.status === 403) throw new Error('The AI service rejected the key. Check it in Settings.');
   if (!res.ok) throw new Error(`The AI service answered ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  via = url === c.home && c.home ? 'home' : '';
   return res.json();
 }
 
 export const models = async () => (await call('/models')).data.map(m => m.id.replace(/^models\//, ''))
   .filter(id => !/embed|imagen|veo|tts|aqa|vision|image/.test(id)).sort();
 
+// When the chosen service can't be reached at all and a Gemini key is saved, Gemini answers instead.
 export async function chat(messages) {
-  const r = await call('/chat/completions', { model: conn().model, messages });
+  const c = conn(), gem = db.settings.ai?.gemini;
+  let r;
+  try { r = await call('/chat/completions', { model: c.model, messages }, c); }
+  catch (e) {
+    if (!e.unreachable || c === gem || !gem?.key) throw e;
+    r = await call('/chat/completions', { model: gem.model || 'gemini-2.5-flash', messages }, gem);
+    via = 'Gemini';
+  }
   const text = r.choices?.[0]?.message?.content;
   if (!text) throw new Error('The AI sent back an empty answer. Try again, or pick another model in Settings.');
   return text;

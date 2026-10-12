@@ -4,7 +4,8 @@ import { load, filter, values, photo, cap } from './exercises.js';
 import * as workout from './workout.js';
 import * as history from './history.js';
 import * as coach from './coach.js';
-import { PRESETS, conn, models, chat } from './ai.js';
+import * as ai from './ai.js';
+const { PRESETS, conn, models, chat } = ai;
 
 const img = (path, alt = '') => path ? `<img src="${photo(path)}" crossorigin="anonymous" loading="lazy" alt="${alt}">` : '';
 
@@ -101,6 +102,7 @@ function renderSettings() {
     <p class="muted">${PRESETS[ai.preset].hint}</p>
     <div class="group form-rows">
       <label>Address<input data-ai="url" value="${esc(c.url)}" placeholder="https://…/v1" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
+${PRESETS[ai.preset].home ? `<label>Home address<input data-ai="home" value="${esc(c.home || "")}" placeholder="optional, e.g. http://192.168.1.37:20128/v1" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false"></label>` : ""}
       <label>API key<input data-ai="key" type="password" value="${esc(c.key)}" autocomplete="off"></label>
       <label>Model<input data-ai="model" list="modelList" value="${esc(c.model)}" placeholder="Tap Test to list models" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
       <datalist id="modelList"></datalist>
@@ -123,7 +125,7 @@ $('#settings').addEventListener('click', async ev => {
     const c = conn();
     if (!c.model) { c.model = list.find(m => /flash|auto/.test(m)) || list[0] || ''; save('settings'); $('[data-ai=model]').value = c.model; }
     await chat([{ role: 'user', content: 'Reply with the single word OK.' }]);
-    msg.textContent = `Connected · ${c.model} · ${list.length} models available`;
+    msg.textContent = `Connected${ai.via ? ` via ${ai.via === 'home' ? 'home address' : ai.via}` : ''} · ${c.model} · ${list.length} models available`;
   } catch (e) { msg.textContent = e.message; }
   b.disabled = false;
 });
