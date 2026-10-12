@@ -206,7 +206,7 @@ $('#settings').addEventListener('input', ev => {
   if (f) { conn()[f] = ev.target.value.trim(); save('settings'); }
 });
 
-workout.init(byId, pick, w => { go('history'); history.detail(w); }, id => show(byId[id]), coach.openPlanBuilder);
+workout.init(byId, pick, w => { go('history'); history.detail(w); }, id => show(byId[id]), coach.openPlanBuilder, coach.openRoutineBuilder);
 history.init(byId);
 coach.init(all, byId);
 go('workout');

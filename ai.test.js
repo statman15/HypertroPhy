@@ -32,3 +32,18 @@ assert.equal(snapRest(0), null);
 assert.equal(snapRest(20), 30);
 assert.equal(snapRest(1000), 300);
 console.log('ai: all checks pass');
+
+// Focused routines: only the chosen groups' muscles make the candidate list.
+import { candidates, MUSCLE_GROUPS } from './ai.js';
+const pool = [
+  { id: 'Bench', primaryMuscles: ['chest'], equipment: 'barbell', category: 'strength', level: 'beginner' },
+  { id: 'Row', primaryMuscles: ['middle back'], equipment: 'barbell', category: 'strength', level: 'beginner' },
+  { id: 'Pushdown', primaryMuscles: ['triceps'], equipment: 'cable', category: 'strength', level: 'beginner' },
+];
+const prof = { goal: 'muscle', level: 'beginner', equipment: ['barbell', 'cable'] };
+assert.deepEqual(candidates(pool, prof, ['Chest', 'Triceps']).map(e => e.id), ['Bench', 'Pushdown']);
+assert.deepEqual(candidates(pool, prof, ['Back']).map(e => e.id), ['Row'], 'Back covers middle back');
+assert.equal(candidates(pool, prof).length, 3, 'no groups: everything');
+const libMuscles = new Set(JSON.parse((await import("node:fs")).readFileSync("data/exercises.json", "utf8")).flatMap(e => e.primaryMuscles));
+assert.deepEqual([...libMuscles].filter(m => !Object.values(MUSCLE_GROUPS).flat().includes(m)), ["neck"], "every library muscle except neck has a group");
+console.log('ai routine filter: all checks pass');

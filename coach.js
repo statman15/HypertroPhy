@@ -1,11 +1,11 @@
 // The Coach tab (chat with your training as context) and the AI plan builder sheet.
 import { $, esc, num, day, icon, sheet, closeSheet } from './ui.js';
-import { db, save, aboutYou, sessions, e1rm } from './store.js';
+import { db, save, uid, aboutYou, sessions, e1rm } from './store.js';
 import { startMonth, weekIndex, monthDone } from './plan.js';
 import { GOALS } from './progression.js';
 import { clock } from './ui.js';
 import * as ai from './ai.js';
-const { chat, candidates, planPrompt, parsePlan, EQUIPMENT } = ai;
+const { chat, candidates, planPrompt, routinePrompt, parsePlan, EQUIPMENT, MUSCLE_GROUPS } = ai;
 import { cap, isTimed } from './exercises.js';
 
 let all, lib, busy = false, error = '';
@@ -25,6 +25,7 @@ export function init(list, byId) {
     if (!b) return;
     if (b.dataset.ask) return send(b.dataset.ask);
     if (b.dataset.act === 'plan') return openPlanBuilder(render);
+    if (b.dataset.act === 'routine') return openRoutineBuilder(render);
     if (b.dataset.act === 'clear' && confirm('Clear this conversation?')) { db.chat = []; save('chat'); error = ''; render(); }
   });
 }
@@ -38,7 +39,8 @@ export function render() {
   <div class="pad chat">
     ${db.chat.length ? '' : `<p class="muted">Ask about your training. The coach sees your goal, your routines and the last 4 weeks of workouts.</p>
       <div class="suggest">${SUGGESTIONS.map(s => `<button data-ask="${esc(s)}">${esc(s)}</button>`).join('')}</div>
-      <button class="pill wide" data-act="plan">${icon('sparkle')}Build a Plan with AI</button>`}
+      <button class="pill wide" data-act="plan">${icon('sparkle')}Build a Month Plan with AI</button>
+      <button class="pill wide quiet" data-act="routine">${icon('sparkle')}Build One Routine</button>`}
     ${db.chat.map(m => `<div class="msg ${m.role}">${fmt(m.content)}</div>${m.via ? `<small class="via">Answered by ${m.via}: your main AI service couldn't be reached</small>` : ''}`).join('')}
     ${busy ? '<div class="msg assistant typing" aria-label="Coach is typing"><i></i><i></i><i></i></div>' : ''}
     ${error ? `<div class="msg error" role="alert">${esc(error)}</div>` : ''}
@@ -115,6 +117,61 @@ export function openPlanBuilder(done) {
     btn.textContent = 'Building your month… this can take a minute or two';
     try { const plan = parsePlan(await chat(planPrompt(list, db.profile, aboutYou(), pastMonths())), lib); plan.via = ai.via === 'Gemini' ? 'Gemini' : ''; preview(plan, done); }
     catch (e) { $('#planMsg').textContent = e.message; btn.disabled = false; btn.textContent = 'Build My Plan'; }
+  };
+}
+
+// --- One routine for chosen muscle groups. It's saved as your own routine (tagged AI), so the Monday plan switch keeps it.
+export function openRoutineBuilder(done) {
+  const p = { ...PROFILE, ...db.profile };
+  const opt = (v, label, cur) => `<option value="${v}"${String(v) === String(cur) ? ' selected' : ''}>${label}</option>`;
+  const body = sheet(`<h2 id="sheetTitle">Build a Routine</h2>
+  <form class="form">
+    <fieldset><legend>Focus on</legend><div class="checks">${Object.keys(MUSCLE_GROUPS).map(g =>
+      `<label><input type="checkbox" name="groups" value="${g}">${g}</label>`).join('')}</div></fieldset>
+    <div class="form-2">
+      <label>Goal<select name="goal">${Object.entries(GOALS).map(([k, g]) => opt(k, g.label, p.goal)).join('')}</select></label>
+      <label>Minutes<select name="minutes">${[20, 30, 45, 60, 75, 90].map(m => opt(m, m, Math.min(p.minutes, 90))).join('')}</select></label>
+    </div>
+    <p class="muted">Uses your equipment and experience from your plan answers (${esc(p.level)}, ${p.equipment.length} kinds of equipment).</p>
+    <button class="pill wide" type="submit">Build Routine</button>
+    <p class="muted" id="routineMsg" role="status"></p>
+  </form>`);
+  body.querySelector('form').onsubmit = async ev => {
+    ev.preventDefault();
+    const f = new FormData(ev.target), btn = ev.target.querySelector('[type=submit]'), groups = f.getAll('groups');
+    if (!groups.length) return void ($('#routineMsg').textContent = 'Tick at least one muscle group.');
+    const prof = { ...p, goal: f.get('goal') }, list = candidates(all, prof, groups);
+    if (list.length < 3) return void ($('#routineMsg').textContent = 'Not enough exercises for those muscles with your equipment. Tick more groups or more equipment in Build a Month Plan.');
+    btn.disabled = true; btn.textContent = 'Building…';
+    $('#routineMsg').textContent = '';
+    try {
+      const plan = parsePlan(await chat(routinePrompt(list, prof, groups, +f.get('minutes'), aboutYou(), pastMonths())), lib);
+      previewRoutine(plan.weeks[0][0], plan, prof.goal, done);
+    } catch (e) { $('#routineMsg').textContent = e.message; btn.disabled = false; btn.textContent = 'Build Routine'; }
+  };
+}
+
+function previewRoutine(d, plan, goal, done) {
+  const g = GOALS[goal];
+  const body = sheet(`<h2 id="sheetTitle">${esc(d.name)}</h2>
+    <p class="muted">${esc(plan.notes)}</p>
+    ${ai.via === 'Gemini' ? '<p class="muted">Built by Gemini: your main AI service couldn\'t be reached.</p>' : ''}
+    ${plan.dropped ? `<p class="muted">Left out ${plan.dropped} exercise${plan.dropped === 1 ? '' : 's'} the AI made up.</p>` : ''}
+    <ol class="group setlist">${d.items.map((it, i) =>
+      `<li><span>${esc(name(it.exId))}${it.ss || d.items[i - 1]?.ss ? ' <small class="pr">superset</small>' : ''}</span><span>${it.sets} × ${it.timed ? `${it.repMin}s` : `${g.repMin}–${g.repMax}`} · <small class="muted">rest ${clock((it.rest ?? g.rest) * 1000)}</small></span></li>`).join('')}</ol>
+    <div class="group menu-list gap">
+      <button data-m="save">Save as Routine</button>
+      <button data-m="again">Change Focus</button>
+    </div>`);
+  body.onclick = ev => {
+    const m = ev.target.closest('[data-m]')?.dataset.m;
+    if (m === 'again') return openRoutineBuilder(done);
+    if (m !== 'save') return;
+    db.routines.push({ id: uid(), name: d.name, aiOne: true,
+      items: d.items.map(it => ({ ...it, repMin: it.timed ? it.repMin : g.repMin, repMax: it.timed ? it.repMax : g.repMax, rest: it.rest ?? g.rest })) });
+    save('routines');
+    closeSheet();
+    done();
   };
 }
 

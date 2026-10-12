@@ -83,10 +83,43 @@ const LEVELS = ['beginner', 'intermediate', 'expert'];
 export const EQUIPMENT = ['barbell', 'dumbbell', 'machine', 'cable', 'kettlebells', 'bands', 'body only', 'e-z curl bar', 'medicine ball', 'exercise ball', 'other'];
 
 // Only exercises the person can do: their equipment, their level or easier, real training (no stretches).
-export function candidates(all, p) {
+// Friendly muscle groups for a single focused routine, mapped to the library's primary muscles.
+export const MUSCLE_GROUPS = {
+  Chest: ['chest'], Back: ['lats', 'middle back', 'lower back', 'traps'], Shoulders: ['shoulders'],
+  Biceps: ['biceps'], Triceps: ['triceps'], Forearms: ['forearms'],
+  Quads: ['quadriceps'], Hamstrings: ['hamstrings'], Glutes: ['glutes', 'abductors', 'adductors'], Calves: ['calves'],
+  Core: ['abdominals'],
+};
+
+// Only exercises the person can do: their equipment, their level or easier, real training (no stretches);
+// with `groups`, only exercises whose primary muscle is in one of them.
+export function candidates(all, p, groups = []) {
   const types = ['strength', 'powerlifting', ...(p.level === 'expert' ? ['olympic weightlifting'] : []), ...(['fatloss', 'tone'].includes(p.goal) ? ['plyometrics'] : [])];
+  const muscles = groups.flatMap(g => MUSCLE_GROUPS[g] || []);
   return all.filter(e => p.equipment.includes(e.equipment) && types.includes(e.category)
-    && LEVELS.indexOf(e.level) <= LEVELS.indexOf(p.level));
+    && LEVELS.indexOf(e.level) <= LEVELS.indexOf(p.level)
+    && (!muscles.length || muscles.includes(e.primaryMuscles[0])));
+}
+
+// One session focused on the chosen muscle groups. Same reply shape as a one-week plan, so parsePlan reads it.
+export function routinePrompt(list, p, groups, minutes, about = '', history = '') {
+  const g = GOALS[p.goal], count = Math.max(3, Math.min(9, Math.round(minutes / 9)));
+  return [
+    { role: 'system', content: 'You are an experienced strength coach. You build workouts using ONLY exercise ids from the list you are given, copied exactly. Reply with JSON only, no other text.' },
+    { role: 'user', content: `Build ONE workout session focused on: ${groups.join(', ')}.
+Goal: ${g.label} (${g.repMin}-${g.repMax} reps; the app sets reps, you choose exercises, set counts and rest).
+About ${minutes} minutes: ${count} exercises. Experience: ${p.level}.${about ? `\nPerson: ${about}.` : ''}${p.avoid ? `\nAvoid or work around: ${p.avoid}.` : ''}
+Rules: split the work fairly between the chosen groups; big compound lifts first; for each group use exercises that hit it from different angles; 2-5 sets each;${p.goal === 'fatloss' ? ' pair exercises into supersets (set superset_with_next on the first of each pair);' : ''} give the session a short name (e.g. "Chest & Triceps").
+Rest: give every exercise rest_seconds (30-300) suited to it and to this goal (typical: about ${g.rest}s); heavy compounds more, isolation and supersets less.
+Exercises marked "timed" are holds measured in seconds: give them "seconds" per set instead of reps.${history ? `
+What they did before (favour lifts that are progressing, and you may vary stalled ones):
+${history}` : ''}
+Reply exactly in this shape:
+{"days":[{"name":"Chest & Triceps","exercises":[{"id":"<id from the list>","sets":3,"rest_seconds":90,"superset_with_next":false}]}],"notes":"1-2 sentences on the session"}
+
+Exercises (id | primary muscle | equipment | mechanic | timed?):
+${list.map(e => `${e.id} | ${e.primaryMuscles[0] || ''} | ${e.equipment} | ${e.mechanic || ''}${isTimed(e) ? ' | timed' : ''}`).join('\n')}` },
+  ];
 }
 
 // A month (4 weeks) in one request. Each day keeps its muscle slots all month; the exercise in a slot can change week to week.

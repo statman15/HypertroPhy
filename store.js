@@ -92,7 +92,7 @@ export function restore(data) {
   if (!ok) throw new Error('That file isn\'t a HypertroPhy backup, or it\'s damaged.');
   const num = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, ['w', 'r', 'sets', 'repMin', 'repMax', 'rest'].includes(k) && v !== '' && v != null ? +v : v]));
   db.workouts = data.workouts.map(w => ({ ...w, name: String(w.name ?? 'Workout'), items: w.items.map(it => ({ ...num(it), sets: it.sets.map(num) })) }));
-  db.routines = data.routines.map(r => ({ id: r.id, name: String(r.name ?? 'Routine'), ...(r.ai && { ai: true }), ...(Number.isInteger(r.week) && { week: r.week }), items: r.items.map(num) }));
+  db.routines = data.routines.map(r => ({ id: r.id, name: String(r.name ?? 'Routine'), ...(r.ai && { ai: true }), ...(r.aiOne && { aiOne: true }), ...(Number.isInteger(r.week) && { week: r.week }), items: r.items.map(num) }));
   const cleanPlan = p => ({ start: p.start, notes: String(p.notes ?? ''), deload: Number.isInteger(p.deload) ? p.deload : null, applied: -1,
     weeks: p.weeks.map(w => w.map(d => ({ name: String(d.name ?? 'Day'), items: d.items.map(num) }))) });
   db.plan = data.plan ? cleanPlan(data.plan) : null;

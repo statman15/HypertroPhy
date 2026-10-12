@@ -99,6 +99,11 @@ android/              Capacitor project (generated)
 - When the month ends, a card offers **Build Next Month**. Finished months go to `db.plans` (last 12), and the prompt gets the last 4 months' exercises per day plus each lift's 8-week trend (up/flat/down), so the AI can keep what progressed, rotate out stalls and bring back older exercises.
 - Plans are in backups and validated on restore (`plan.test.js`).
 
+## One focused AI routine (2026-10-12) ✅
+- Workout tab (✦ AI next to New Routine) or Coach tab → **Build a Routine**: tick muscle groups (`MUSCLE_GROUPS` in ai.js maps Chest/Back/Shoulders/Biceps/Triceps/Forearms/Quads/Hamstrings/Glutes/Calves/Core to library muscles), pick goal and minutes. Uses the plan answers' equipment and level.
+- `candidates(all, profile, groups)` keeps only those groups' primary muscles; `routinePrompt` asks for one session in the one-week shape, so `parsePlan` reads it. Recent progress (`pastMonths`) goes along too.
+- Saved as your own routine tagged **AI** (`aiOne: true`, not `ai`), so the Monday month-plan switch never replaces it.
+
 ## Android build notes
 - Web files are copied into `www/` by `npm run sync` (copy-web.js + cap sync); never edit `www/` or `android/app/src/main/assets` by hand.
 - Keystore: `~/hypertrophy-keystore` (release.p12, password.txt, release.p12.b64), also in repo secrets KEYSTORE_B64 / KEYSTORE_PASSWORD. **Back the folder up to the password manager**: every future APK must be signed with it or updates won't install.

@@ -6,7 +6,7 @@ import { startGuess } from './guess.js';
 import { isTimed } from './exercises.js';
 import { applyWeek, weekIndex, monthDone, monday } from './plan.js';
 
-let lib, pick, onFinish, info, buildPlan, editing = null, lock = null, audio = null;
+let lib, pick, onFinish, info, buildPlan, buildRoutine, editing = null, lock = null, audio = null;
 const root = () => $('#workout');
 const name = id => lib[id]?.name || id;
 const blankSets = n => Array.from({ length: n }, () => ({ w: '', r: '' }));
@@ -36,8 +36,8 @@ async function syncRestNote() {
   } catch {} // no notification is fine: the in-app timer still runs
 }
 
-export function init(byId, picker, finished, showInfo, planBuilder) {
-  [lib, pick, onFinish, info, buildPlan] = [byId, picker, finished, showInfo, planBuilder];
+export function init(byId, picker, finished, showInfo, planBuilder, routineBuilder) {
+  [lib, pick, onFinish, info, buildPlan, buildRoutine] = [byId, picker, finished, showInfo, planBuilder, routineBuilder];
   root().addEventListener('click', onClick);
   root().addEventListener('input', onInput);
   $('#rest').addEventListener('click', ev => {
@@ -72,9 +72,9 @@ ${backupDue() ? `<div class="card group nag"><b>Back up your workouts</b><p clas
     ${planCard()}
     <button class="pill wide" data-act="empty">Start Empty Workout</button>
     ${db.plan && !monthDone() ? '' : `<button class="pill wide quiet" data-act="plan">${icon('sparkle')}${db.plan ? 'Build Next Month' : 'Build a Month Plan with AI'}</button>`}
-    <div class="sec"><h2>Routines</h2><button class="text-btn" data-act="new">New Routine</button></div>
+    <div class="sec"><h2>Routines</h2><span><button class="text-btn" data-act="airoutine">${icon('sparkle')}AI</button><button class="text-btn" data-act="new">New Routine</button></span></div>
     ${db.routines.length ? db.routines.map(r => `<div class="card group">
-      <div class="card-top"><b>${esc(r.name)}${r.ai ? ` <small class="pr">${r.week ? `Week ${r.week | 0}` : 'AI plan'}</small>` : ''}</b><button class="text-btn" data-act="edit" data-id="${r.id}">Edit</button></div>
+      <div class="card-top"><b>${esc(r.name)}${r.ai ? ` <small class="pr">${r.week ? `Week ${r.week | 0}` : 'AI plan'}</small>` : r.aiOne ? ' <small class="pr">AI</small>' : ''}</b><button class="text-btn" data-act="edit" data-id="${r.id}">Edit</button></div>
       <p class="a">${esc(r.items.map(it => name(it.exId)).join(', ') || 'No exercises yet')}</p>
       <button class="pill wide" data-act="start" data-id="${r.id}">Start Routine</button>
     </div>`).join('') : '<p class="muted">No routines yet. Make one here, or finish a workout and save it as a routine from History.</p>'}
@@ -199,6 +199,7 @@ function onClick(ev) {
       db.routines = db.routines.filter(r => r.id !== editing.id); save('routines'); editing = null; break;
     case 'add': return pick(ex => addExercise(ex.id));
     case 'plan': return buildPlan(render);
+    case 'airoutine': return buildRoutine(render);
     case 'info': return info(a.items[i].exId);
     case 'menu': return menu(i);
     case 'plates': return showPlates(a.items[i]);
