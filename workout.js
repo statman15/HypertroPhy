@@ -48,6 +48,7 @@ export function render() {
 function idleHtml() {
   return `<div class="head"><h1>Workout</h1></div>
   <div class="pad">
+${backupDue() ? `<div class="card group nag"><b>Back up your workouts</b><p class="a">Your data lives only on this phone. It's been over 2 weeks without a backup.</p><button class="pill wide quiet" data-backup>Save Backup</button></div>` : ''}
     <button class="pill wide" data-act="empty">Start Empty Workout</button>
     <button class="pill wide quiet" data-act="plan">${icon('sparkle')}Build a Plan with AI</button>
     <div class="sec"><h2>Routines</h2><button class="text-btn" data-act="new">New Routine</button></div>
@@ -58,6 +59,9 @@ function idleHtml() {
     </div>`).join('') : '<p class="muted">No routines yet. Make one here, or finish a workout and save it as a routine from History.</p>'}
   </div>`;
 }
+
+// Nag once there's data and nothing has been backed up for 14 days (counting from the first workout).
+const backupDue = () => db.workouts.length > 0 && Date.now() - (db.settings.lastBackup || db.workouts.at(-1).start) > 14 * 864e5;
 
 function activeHtml() {
   const a = db.active, u = db.settings.units;

@@ -1,5 +1,5 @@
-import { $, esc, sheet } from './ui.js';
-import { db, save, setUnits } from './store.js';
+import { $, esc, day, sheet } from './ui.js';
+import { db, save, setUnits, backup, restore } from './store.js';
 import { load, filter, values, photo, cap } from './exercises.js';
 import * as workout from './workout.js';
 import * as history from './history.js';
@@ -109,6 +109,13 @@ ${PRESETS[ai.preset].home ? `<label>Home address<input data-ai="home" value="${e
     </div>
     <button class="pill wide" data-test>Test Connection</button>
     <p class="muted" id="aiMsg" role="status">The key is stored only on this phone.</p>
+
+    <h3 class="label">Backup</h3>
+    <div class="group menu-list">
+      <button data-backup>Save Backup</button>
+      <label>Restore from Backup<input type="file" id="importFile" accept="application/json,.json"></label>
+    </div>
+    <p class="muted" id="backupMsg" role="status">Last backup: ${db.settings.lastBackup ? day(db.settings.lastBackup) : 'never'}. The file holds your workouts, routines and plan answers. AI keys stay on this phone.</p>
   </div>`;
 }
 $('#settings').addEventListener('click', async ev => {
@@ -129,6 +136,19 @@ $('#settings').addEventListener('click', async ev => {
   } catch (e) { msg.textContent = e.message; }
   b.disabled = false;
 });
+$('#settings').addEventListener('change', async ev => {
+  if (ev.target.id !== 'importFile') return;
+  const file = ev.target.files[0];
+  ev.target.value = '';
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (!confirm(`Replace everything on this phone with the backup from ${data.exported ? day(data.exported) : 'an unknown date'}? This can't be undone.`)) return;
+    const n = restore(data);
+    renderSettings();
+    $('#backupMsg').textContent = `Restored ${n} workout${n === 1 ? '' : 's'}.`;
+  } catch (e) { $('#backupMsg').textContent = e instanceof SyntaxError ? 'That file isn\'t a HypertroPhy backup.' : e.message; }
+});
 $('#settings').addEventListener('input', ev => {
   const f = ev.target.dataset.ai;
   if (f) { conn()[f] = ev.target.value.trim(); save('settings'); }
@@ -138,3 +158,47 @@ workout.init(byId, pick, w => { go('history'); history.detail(w); }, id => show(
 history.init(byId);
 coach.init(all, byId);
 go('workout');
+
+// --- Backup: the share sheet (Drive, Files, email…) where the phone has one, else a download.
+// The Android app's WebView can't share files, so it writes the file and shares it natively.
+async function saveBackup() {
+  const json = JSON.stringify(backup()), name = `hypertrophy-${new Date().toISOString().slice(0, 10)}.json`;
+  try {
+    if (window.Capacitor?.isNativePlatform?.()) {
+      const { Filesystem, Share } = window.Capacitor.Plugins;
+      const { uri } = await Filesystem.writeFile({ path: name, data: json, directory: 'CACHE', encoding: 'utf8' });
+      await Share.share({ title: 'HypertroPhy backup', files: [uri] });
+    } else {
+      const file = new File([json], name, { type: 'application/json' });
+      if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: 'HypertroPhy backup' });
+      else { const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(file), download: name }); a.click(); URL.revokeObjectURL(a.href); }
+    }
+  } catch (e) { if (e.name === 'AbortError' || /cancel/i.test(e.message)) return; alert(`Couldn't save the backup: ${e.message}`); return; }
+  db.settings.lastBackup = Date.now();
+  save('settings');
+  if (!$('#settings').hidden) renderSettings();
+  if (!$('#workout').hidden) workout.render();
+}
+document.addEventListener('click', ev => { if (ev.target.closest('[data-backup]')) saveBackup(); });
+
+// --- Android app: a banner when GitHub has a newer release. Checked on open and on return, at most every 6 hours.
+// Update navigates to the APK, which Capacitor hands to the system browser; Android then offers to install it over this one (same signing key, data kept).
+const native = window.Capacitor?.isNativePlatform?.();
+const newer = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
+let checkedAt = 0;
+async function checkUpdate() {
+  if (!native || Date.now() - checkedAt < 6 * 3600e3) return;
+  checkedAt = Date.now();
+  try {
+    const { version } = await (await fetch('version.json')).json();
+    const rel = await (await fetch('https://api.github.com/repos/statman15/HypertroPhy/releases/latest')).json();
+    const latest = String(rel.tag_name || '').replace(/^v/, ''), apk = rel.assets?.find(a => a.name.endsWith('.apk'))?.browser_download_url;
+    if (version === 'dev' || !apk || !newer(latest, version) || localStorage.getItem('skipUpdate') === latest) return;
+    $('#updateText').textContent = `Update available: ${latest}`;
+    $('#updateGo').href = apk;
+    $('#updateSkip').onclick = () => { localStorage.setItem('skipUpdate', latest); $('#update').hidden = true; };
+    $('#update').hidden = false;
+  } catch {} // offline or rate-limited: try again next time
+}
+checkUpdate();
+document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && checkUpdate());

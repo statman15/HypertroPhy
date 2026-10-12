@@ -42,3 +42,33 @@ export function setUnits(units) {
   db.settings.units = units;
   save('settings', 'workouts', 'active');
 }
+
+// --- Backup. AI keys never go in the file: they stay on each phone, and restoring keeps this phone's AI setup.
+export function backup() {
+  const settings = { ...db.settings };
+  delete settings.ai;
+  return { app: 'HypertroPhy', format: 1, exported: Date.now(), settings, routines: db.routines, workouts: db.workouts, profile: db.profile, chat: db.chat };
+}
+
+// A backup file is outside input, and its ids and numbers end up in HTML attributes, so check every field that gets rendered.
+const id = v => typeof v === 'string' && /^[\w.-]{1,64}$/.test(v);
+const n = v => v === '' || Number.isFinite(+v);
+const item = it => id(it?.exId) && Array.isArray(it.sets) && it.sets.every(s => n(s?.w) && n(s?.r));
+const routineItem = it => id(it?.exId) && [it.sets, it.repMin, it.repMax, it.rest].every(v => v == null || Number.isFinite(+v));
+
+export function restore(data) {
+  const ok = data?.app === 'HypertroPhy' && ['lb', 'kg'].includes(data.settings?.units)
+    && Array.isArray(data.workouts) && data.workouts.every(w => id(w?.id) && Number.isFinite(w.start) && Number.isFinite(w.end) && Array.isArray(w.items) && w.items.every(item))
+    && Array.isArray(data.routines) && data.routines.every(r => id(r?.id) && Array.isArray(r.items) && r.items.every(routineItem));
+  if (!ok) throw new Error('That file isn\'t a HypertroPhy backup, or it\'s damaged.');
+  const num = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, ['w', 'r', 'sets', 'repMin', 'repMax', 'rest'].includes(k) && v !== '' && v != null ? +v : v]));
+  db.workouts = data.workouts.map(w => ({ ...w, name: String(w.name ?? 'Workout'), items: w.items.map(it => ({ ...num(it), sets: it.sets.map(num) })) }));
+  db.routines = data.routines.map(r => ({ ...r, name: String(r.name ?? 'Routine'), items: r.items.map(num) }));
+  const p = data.profile;
+  db.profile = p && ['strength', 'muscle', 'tone', 'fatloss'].includes(p.goal) && Array.isArray(p.equipment) ? p : null;
+  db.chat = Array.isArray(data.chat) ? data.chat.filter(m => ['user', 'assistant'].includes(m?.role) && typeof m.content === 'string') : [];
+  db.settings = { units: data.settings.units, ai: db.settings.ai, lastBackup: data.exported };
+  db.active = null;
+  save('settings', 'routines', 'workouts', 'profile', 'chat', 'active');
+  return db.workouts.length;
+}
