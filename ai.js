@@ -13,13 +13,15 @@ export const PRESETS = {
 export const conn = () => { const a = db.settings.ai; return a?.[a.preset] || {}; };
 
 const host = url => { try { return new URL(url).host; } catch { return url; } };
+// A bare address (https://host:port) means the usual /v1; Gemini's longer path is left alone.
+const base = url => { const u = url.trim().replace(/\/+$/, ''); try { return new URL(u).pathname === '/' ? u + '/v1' : u; } catch { return u; } };
 
 async function call(path, body) {
   const { url, key } = conn();
   if (!url || !key) throw new Error('Set up the AI connection in Settings first.');
   let res;
   try {
-    res = await fetch(url.replace(/\/+$/, '') + path, {
+    res = await fetch(base(url) + path, {
       method: body ? 'POST' : 'GET',
       headers: { Authorization: `Bearer ${key}`, ...(body && { 'Content-Type': 'application/json' }) },
       body: body && JSON.stringify(body),
