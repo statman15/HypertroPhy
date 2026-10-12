@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="HypertroPhy">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#ffffff">
+<script>
+  // Android's installed app ignores theme-color's media attribute, so set one tag from the phone's mode (same as Bookshelf).
+  (() => {
+    const dark = matchMedia('(prefers-color-scheme: dark)');
+    const tag = document.querySelector('meta[name="theme-color"]');
+    const set = () => { tag.content = dark.matches ? '#0c0c0d' : '#ffffff'; };
+    set();
+    dark.addEventListener('change', set);
+  })();
+</script>
+<title>HypertroPhy</title>
+<style>
+  /* Bookshelf's iPhone grammar, with an iron-orange tint. */
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff; --sheet: #f2f2f7; --group: #ffffff;
+    --label: #111113; --label2: #636366; --sep: rgba(60, 60, 67, .2);
+    --fill: rgba(118, 118, 128, .12); --fill-strong: rgba(118, 118, 128, .2);
+    --tint: #c2410c; --on-tint: #ffffff; --danger: #d70015;
+    --lift: rgba(30, 20, 15, .16);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0c0c0d; --sheet: #1c1c1e; --group: #2c2c2e;
+      --label: #f5f5f7; --label2: #a1a1a6; --sep: rgba(84, 84, 88, .6);
+      --fill: rgba(118, 118, 128, .24); --fill-strong: rgba(118, 118, 128, .36);
+      --tint: #ff8a4c; --on-tint: #2a1003; --danger: #ff6961;
+      --lift: rgba(0, 0, 0, .5);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body { margin: 0; min-height: 100dvh; font-size: 17px; line-height: 1.3; color: var(--label); background: var(--bg);
+    padding-bottom: max(16px, env(safe-area-inset-bottom)); -webkit-tap-highlight-color: transparent; }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; background: none; border: 0; padding: 0; touch-action: manipulation; text-align: left; }
+  :focus-visible { outline: 2px solid var(--tint); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+  .ic { width: 22px; height: 22px; flex: none; fill: currentColor; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  .head { position: sticky; top: 0; z-index: 2; padding: calc(16px + env(safe-area-inset-top)) 16px 10px; background: var(--bg); box-shadow: 0 .5px 0 var(--sep); }
+  .head h1 { margin: 0; font-size: 34px; font-weight: 700; line-height: 41px; letter-spacing: .01em; }
+  .count { margin: 0 0 12px; font-size: 15px; color: var(--label2); font-variant-numeric: tabular-nums; }
+  .search { display: flex; align-items: center; gap: 6px; height: 38px; padding: 0 8px; border-radius: 10px; background: var(--fill); color: var(--label2); }
+  .search .ic { width: 18px; height: 18px; }
+  .search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none; color: var(--label); font-size: 17px; -webkit-appearance: none; }
+  .search input::placeholder { color: var(--label2); }
+  .search:focus-within { box-shadow: 0 0 0 2px color-mix(in srgb, var(--tint) 55%, transparent); }
+
+  /* Filters are native selects dressed as capsules: the phone's own picker does the work. */
+  .filters { display: flex; gap: 8px; margin-top: 10px; overflow-x: auto; scrollbar-width: none; }
+  .chip { position: relative; flex: none; display: flex; align-items: center; height: 34px; border-radius: 999px; background: var(--fill); font-size: 15px; font-weight: 500; }
+  .chip select { height: 100%; padding: 0 30px 0 14px; border: 0; border-radius: inherit; background: none; -webkit-appearance: none; appearance: none; }
+  .chip::after { content: ''; position: absolute; right: 13px; top: 13px; width: 6px; height: 6px; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); pointer-events: none; }
+  .chip.on { color: var(--on-tint); background: var(--tint); }
+  .chip.on select { font-weight: 600; }
+  .chip option { color: initial; }
+
+  .list { list-style: none; margin: 0; padding: 0 16px; }
+  .row { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 12px; align-items: center; width: 100%; padding: 8px 0; box-shadow: inset 0 -.5px 0 var(--sep); }
+  .row:active { opacity: .6; }
+  .list li { content-visibility: auto; contain-intrinsic-size: auto 73px; }
+  .thumb { width: 56px; height: 56px; border-radius: 10px; overflow: hidden; background: #fff; box-shadow: inset 0 0 0 .5px var(--sep); }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .row .t { display: -webkit-box; overflow: hidden; font-weight: 600; line-height: 1.2; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .row .a { display: block; margin-top: 2px; overflow: hidden; font-size: 15px; color: var(--label2); white-space: nowrap; text-overflow: ellipsis; }
+
+  .empty { display: grid; justify-items: center; gap: 6px; padding: 56px 32px; text-align: center; }
+  .empty h2 { margin: 0; font-size: 22px; font-weight: 700; }
+  .empty p { max-width: 30ch; margin: 0 0 12px; color: var(--label2); }
+  .pill { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 20px; border-radius: 999px; font-weight: 600; color: var(--on-tint); background: var(--tint); }
+  .pill:active { transform: scale(.97); opacity: .9; }
+
+  .sheet { position: fixed; inset: auto 0 0 0; width: 100%; max-width: 600px; max-height: calc(100dvh - env(safe-area-inset-top) - 10px); margin: 0 auto;
+    padding: 0 16px calc(16px + env(safe-area-inset-bottom)); border: 0; border-radius: 22px 22px 0 0; color: var(--label); background: var(--sheet);
+    overflow: auto; overscroll-behavior: contain; }
+  .sheet::backdrop { background: rgba(0, 0, 0, .35); }
+  .sheet[open] { animation: rise .28s cubic-bezier(.2, .9, .25, 1); }
+  @keyframes rise { from { transform: translateY(100%); } }
+  .close { position: sticky; top: 14px; z-index: 2; float: right; display: grid; place-items: center; width: 32px; height: 32px; margin: 14px -2px 0 0; border-radius: 50%; color: var(--label2); background: var(--fill); }
+  .close .ic { width: 15px; height: 15px; }
+  .sheet h2 { margin: 16px 0 12px; font-size: 22px; font-weight: 700; line-height: 1.2; }
+  .sheet h3 { margin: 20px 0 8px; font-size: 17px; font-weight: 600; }
+
+  /* The demo: start and end photos stacked, the end photo blinking in every second to read as the movement. */
+  .demo { position: relative; margin: 58px -16px 0; aspect-ratio: 3 / 2; background: #fff; }
+  .demo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .demo img + img { animation: flip 2s steps(1) infinite; }
+  @keyframes flip { 0% { opacity: 0; } 50% { opacity: 1; } }
+
+  .group { margin: 0; border-radius: 12px; background: var(--group); overflow: hidden; }
+  .facts { padding: 4px 16px; }
+  .facts div { display: flex; gap: 16px; justify-content: space-between; padding: 10px 0; font-size: 15px; }
+  .facts div + div { box-shadow: inset 0 .5px 0 var(--sep); }
+  .facts dt { flex: none; color: var(--label2); }
+  .facts dd { margin: 0; text-align: right; }
+  .steps { margin: 0; padding-left: 22px; font-size: 15px; line-height: 1.45; }
+  .steps li + li { margin-top: 8px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    /* No blinking: show the two positions side by side. */
+    .demo { display: grid; grid-template-columns: 1fr 1fr; aspect-ratio: 3 / 1; }
+    .demo img { position: static; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <!-- Phosphor Icons 2.1.1 (MIT) -->
+  <symbol id="search" viewBox="0 0 256 256"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></symbol>
+  <symbol id="x" viewBox="0 0 256 256"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></symbol>
+</svg>
+
+<main>
+  <div class="head">
+    <h1>Exercises</h1>
+    <p id="count" class="count"></p>
+    <label class="search"><svg class="ic" aria-hidden="true"><use href="#search"/></svg><span class="visually-hidden">Search exercises</span>
+      <input type="search" id="q" placeholder="Search" autocomplete="off"></label>
+    <div class="filters">
+      <label class="chip"><span class="visually-hidden">Muscle</span><select id="muscle"><option value="">All Muscles</option></select></label>
+      <label class="chip"><span class="visually-hidden">Equipment</span><select id="equip"><option value="">All Equipment</option></select></label>
+    </div>
+  </div>
+  <ul id="list" class="list"></ul>
+  <div id="empty" class="empty" hidden>
+    <h2>No Matches</h2>
+    <p>Try a different name, or clear the filters.</p>
+    <button id="clear" class="pill">Clear Filters</button>
+  </div>
+</main>
+
+<dialog id="sheet" class="sheet" aria-labelledby="sheetTitle">
+  <button class="close" data-done aria-label="Close"><svg class="ic" aria-hidden="true"><use href="#x"/></svg></button>
+  <div id="sheetBody"></div>
+</dialog>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
