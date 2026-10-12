@@ -4,6 +4,7 @@ import { db, save, uid, lastSets, sessions, records, e1rm, volume, bodyweight } 
 import { nextTarget, nextHold, stepFor, DEFAULT_RANGE, TIME_RANGE, GOALS, plates, warmups, PLATE_DEFAULTS } from './progression.js';
 import { startGuess } from './guess.js';
 import { isTimed } from './exercises.js';
+import { applyWeek, weekIndex, monthDone, monday } from './plan.js';
 
 let lib, pick, onFinish, info, buildPlan, editing = null, lock = null, audio = null;
 const root = () => $('#workout');
@@ -59,6 +60,7 @@ export function init(byId, picker, finished, showInfo, planBuilder) {
 }
 
 export function render() {
+  if (!db.active && !editing) applyWeek(); // a new Monday swaps in that week's AI routines
   root().innerHTML = editing ? editorHtml() : db.active ? activeHtml() : idleHtml();
   tick();
 }
@@ -67,11 +69,12 @@ function idleHtml() {
   return `<div class="head"><h1>Workout</h1></div>
   <div class="pad">
 ${backupDue() ? `<div class="card group nag"><b>Back up your workouts</b><p class="a">Your data lives only on this phone. It's been over 2 weeks without a backup.</p><button class="pill wide quiet" data-backup>Save Backup</button></div>` : ''}
+    ${planCard()}
     <button class="pill wide" data-act="empty">Start Empty Workout</button>
-    <button class="pill wide quiet" data-act="plan">${icon('sparkle')}Build a Plan with AI</button>
+    ${db.plan && !monthDone() ? '' : `<button class="pill wide quiet" data-act="plan">${icon('sparkle')}${db.plan ? 'Build Next Month' : 'Build a Month Plan with AI'}</button>`}
     <div class="sec"><h2>Routines</h2><button class="text-btn" data-act="new">New Routine</button></div>
     ${db.routines.length ? db.routines.map(r => `<div class="card group">
-      <div class="card-top"><b>${esc(r.name)}${r.ai ? ' <small class="pr">AI plan</small>' : ''}</b><button class="text-btn" data-act="edit" data-id="${r.id}">Edit</button></div>
+      <div class="card-top"><b>${esc(r.name)}${r.ai ? ` <small class="pr">${r.week ? `Week ${r.week}` : 'AI plan'}</small>` : ''}</b><button class="text-btn" data-act="edit" data-id="${r.id}">Edit</button></div>
       <p class="a">${esc(r.items.map(it => name(it.exId)).join(', ') || 'No exercises yet')}</p>
       <button class="pill wide" data-act="start" data-id="${r.id}">Start Routine</button>
     </div>`).join('') : '<p class="muted">No routines yet. Make one here, or finish a workout and save it as a routine from History.</p>'}
@@ -80,6 +83,18 @@ ${backupDue() ? `<div class="card group nag"><b>Back up your workouts</b><p clas
 
 // Nag once there's data and nothing has been backed up for 14 days (counting from the first workout).
 const backupDue = () => db.workouts.length > 0 && Date.now() - (db.settings.lastBackup || db.workouts.at(-1).start) > 14 * 864e5;
+
+// Where you are in the month plan; once it's over, the way to the next one.
+function planCard() {
+  const p = db.plan;
+  if (!p) return '';
+  if (monthDone()) return `<div class="card group nag"><b>Your month is done</b>
+    <p class="a">Build next month: the AI looks at what you did and how each lift moved, and can bring back exercises from earlier months. Until then, last week's routines stay.</p></div>`;
+  const k = weekIndex(), from = monday(Date.now()), to = from + 6 * 864e5;
+  return `<div class="card group plan-card"><div class="card-top"><b>Week ${k + 1} of ${p.weeks.length}</b><small class="muted">${day(from)} – ${day(to)}</small></div>
+    <p class="a">${p.deload === k ? 'Deload week: fewer sets, and targets are about 10% lighter. Recovery is part of the plan.' : esc(p.notes || 'Your AI routines below switch to next week\'s set on Monday.')}</p>
+    <button class="text-btn" data-act="plan">Rebuild this month</button></div>`;
+}
 
 function activeHtml() {
   const a = db.active, u = db.settings.units;
@@ -137,8 +152,15 @@ function prevSet(it, j) { const p = lastSets(it.exId); return p[j] || p.at(-1); 
 const range = it => timed(it) ? (it.timed && it.repMin ? it : TIME_RANGE) : it.repMin ? it : GOALS[db.profile?.goal] || DEFAULT_RANGE;
 // Reps (or seconds) to suggest with no history: the top of a rep range, the bottom of a hold range.
 const firstR = it => timed(it) ? range(it).repMin : range(it).repMax;
-const target = it => timed(it) ? nextHold(sessions(it.exId).map(s => s.sets), range(it)) : targetLift(it);
-const targetLift = it => { const ex = lib[it.exId], st = stepFor(ex, db.settings.units); return nextTarget(sessions(it.exId).map(s => s.sets), { ...range(it), ...st, step: Math.max(st.step, ex ? roundFor(ex) : 0) }); };
+const target = it => timed(it) ? nextHold(sessions(it.exId).filter(s => !s.deload).map(s => s.sets), range(it)) : targetLift(it);
+const targetLift = it => {
+  const t = liftTarget(it), ex = lib[it.exId];
+  if (!it.deload || !t || !(t.w > 0) || !ex) return t;
+  const round = roundFor(ex), bar = ex.equipment === 'barbell' ? kit().bar : 0;
+  const w = bar ? Math.max(bar, bar + Math.floor((t.w * 0.9 - bar) / round) * round) : Math.max(round, Math.floor(t.w * 0.9 / round) * round);
+  return { ...t, w, kind: 'deload' };
+};
+const liftTarget = it => { const ex = lib[it.exId], st = stepFor(ex, db.settings.units); return nextTarget(sessions(it.exId).filter(s => !s.deload).map(s => s.sets), { ...range(it), ...st, step: Math.max(st.step, ex ? roundFor(ex) : 0) }); };
 // A first-time exercise gets a starting guess from bodyweight, sex and experience (needs About You filled in).
 const guess = it => {
   const ex = lib[it.exId];
@@ -206,7 +228,7 @@ function onInput(ev) {
 function start(r) {
   db.active = {
     id: uid(), name: r.name, routineId: r.id, start: Date.now(),
-    items: r.items.map(it => ({ exId: it.exId, rest: it.rest, ss: it.ss, timed: it.timed, repMin: it.repMin, repMax: it.repMax, sets: blankSets(it.sets) })),
+    items: r.items.map(it => ({ exId: it.exId, rest: it.rest, ss: it.ss, timed: it.timed, deload: it.deload, repMin: it.repMin, repMax: it.repMax, sets: blankSets(it.sets) })),
   };
   keepAwake();
 }
@@ -339,7 +361,7 @@ function check(i, j) {
 function finish() {
   const a = db.active;
   const items = a.items
-    .map(it => ({ exId: it.exId, rest: it.rest, ss: it.ss, ...(timed(it) && { timed: true }), repMin: it.repMin, repMax: it.repMax, sets: it.sets.filter(s => s.done).map(s => ({ w: s.w, r: s.r, ...(s.wu && { wu: true }) })) }))
+    .map(it => ({ exId: it.exId, rest: it.rest, ss: it.ss, ...(timed(it) && { timed: true }), ...(it.deload && { deload: true }), repMin: it.repMin, repMax: it.repMax, sets: it.sets.filter(s => s.done).map(s => ({ w: s.w, r: s.r, ...(s.wu && { wu: true }) })) }))
     .filter(it => it.sets.length);
   if (!items.length) {
     if (!confirm('No sets are checked off. Discard this workout?')) return;

@@ -93,6 +93,12 @@ android/              Capacitor project (generated)
 - **Timed exercises** (planks, side bridges, carries, cardio, stretches): `isTimed()` in exercises.js (force "static", cardio, carries), and the ⋯ menu switches any exercise between Track by Time and Track by Reps. Sets are seconds: a ▶ hold timer counts down the target, buzzes (Android notification id 2), logs the set and starts the rest; Done stops early and logs the time held. The default range is 20–60 s, the first-time default is 20 s, progression is +5 s on the shortest hold (`nextHold`), and the PR/record is the longest hold. Timed items are left out of volume.
 - **AI picks rest per exercise** (`rest_seconds`, snapped to the timer choices; heavy compounds longer, isolation and supersets shorter) and **seconds for holds**; the goal's rest is only the fallback.
 
+## Month plans (2026-10-12) ✅
+- The AI builds **4 weeks** in one request (`planPrompt`/`parsePlan` in ai.js): the same days and muscle slots every week, exercises swapped within a slot for others that hit the same muscle, the first big lift kept at least 2 weeks, and week 4 a deload (about half the sets).
+- `plan.js`: `db.plan` starts on the Monday of the week it's built. Each Monday `applyWeek()` swaps the AI routines to that week (your own routines stay). In the deload week targets are ~10% lighter (loadable), and deload sessions never feed progression.
+- When the month ends, a card offers **Build Next Month**. Finished months go to `db.plans` (last 12), and the prompt gets the last 4 months' exercises per day plus each lift's 8-week trend (up/flat/down), so the AI can keep what progressed, rotate out stalls and bring back older exercises.
+- Plans are in backups and validated on restore (`plan.test.js`).
+
 ## Android build notes
 - Web files are copied into `www/` by `npm run sync` (copy-web.js + cap sync); never edit `www/` or `android/app/src/main/assets` by hand.
 - Keystore: `~/hypertrophy-keystore` (release.p12, password.txt, release.p12.b64), also in repo secrets KEYSTORE_B64 / KEYSTORE_PASSWORD. **Back the folder up to the password manager**: every future APK must be signed with it or updates won't install.

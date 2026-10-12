@@ -11,6 +11,8 @@ export const db = {
   chat: read('chat', []),         // coach conversation, last 50 messages
   // About you: sex '' | 'male' | 'female', birthYear, heightCm, and weigh-ins [{ t, w, src? }] oldest first (w in the current unit).
   body: read('body', { sex: '', birthYear: '', heightCm: '', weights: [] }),
+  plan: read('plan', null),  // the current month: { start, weeks: [[{ name, items }]], notes, deload, applied } (plan.js)
+  plans: read('plans', []),  // earlier months, newest first, kept for the next month's prompt
 };
 export const save = (...keys) => { for (const k of keys) localStorage.setItem(k, JSON.stringify(db[k])); };
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -24,7 +26,7 @@ export const volume = items => items.reduce((t, it) => it.timed ? t : t + workin
 
 // Sessions of one exercise, newest first: [{ date, sets }], working sets only.
 export const sessions = exId => db.workouts.flatMap(w => w.items.filter(it => it.exId === exId)
-  .map(it => ({ date: w.start, sets: working(it.sets) })).filter(s => s.sets.length));
+  .map(it => ({ date: w.start, sets: working(it.sets), ...(it.deload && { deload: true }) })).filter(s => s.sets.length));
 export const lastSets = exId => sessions(exId)[0]?.sets || [];
 
 export function records(exId) {
@@ -70,7 +72,7 @@ export function aboutYou() {
 export function backup() {
   const settings = { ...db.settings };
   delete settings.ai;
-  return { app: 'HypertroPhy', format: 1, exported: Date.now(), settings, routines: db.routines, workouts: db.workouts, profile: db.profile, chat: db.chat, body: db.body };
+  return { app: 'HypertroPhy', format: 1, exported: Date.now(), settings, routines: db.routines, workouts: db.workouts, profile: db.profile, chat: db.chat, body: db.body, plan: db.plan, plans: db.plans };
 }
 
 // A backup file is outside input, and its ids and numbers end up in HTML attributes, so check every field that gets rendered.
@@ -78,16 +80,23 @@ const id = v => typeof v === 'string' && /^[\w.-]{1,64}$/.test(v);
 const n = v => v === '' || Number.isFinite(+v);
 const item = it => id(it?.exId) && Array.isArray(it.sets) && it.sets.every(s => n(s?.w) && n(s?.r));
 // (body weigh-ins are checked field by field in restore)
+const planOk = p => Number.isFinite(p?.start) && Array.isArray(p.weeks) && p.weeks.length <= 8
+  && p.weeks.every(w => Array.isArray(w) && w.every(d => Array.isArray(d?.items) && d.items.every(routineItem)));
 const routineItem = it => id(it?.exId) && [it.sets, it.repMin, it.repMax, it.rest].every(v => v == null || Number.isFinite(+v));
 
 export function restore(data) {
   const ok = data?.app === 'HypertroPhy' && ['lb', 'kg'].includes(data.settings?.units)
     && Array.isArray(data.workouts) && data.workouts.every(w => id(w?.id) && Number.isFinite(w.start) && Number.isFinite(w.end) && Array.isArray(w.items) && w.items.every(item))
-    && Array.isArray(data.routines) && data.routines.every(r => id(r?.id) && Array.isArray(r.items) && r.items.every(routineItem));
+    && Array.isArray(data.routines) && data.routines.every(r => id(r?.id) && Array.isArray(r.items) && r.items.every(routineItem))
+    && (data.plan == null || planOk(data.plan)) && (data.plans == null || Array.isArray(data.plans) && data.plans.every(planOk));
   if (!ok) throw new Error('That file isn\'t a HypertroPhy backup, or it\'s damaged.');
   const num = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, ['w', 'r', 'sets', 'repMin', 'repMax', 'rest'].includes(k) && v !== '' && v != null ? +v : v]));
   db.workouts = data.workouts.map(w => ({ ...w, name: String(w.name ?? 'Workout'), items: w.items.map(it => ({ ...num(it), sets: it.sets.map(num) })) }));
   db.routines = data.routines.map(r => ({ ...r, name: String(r.name ?? 'Routine'), items: r.items.map(num) }));
+  const cleanPlan = p => ({ start: p.start, notes: String(p.notes ?? ''), deload: Number.isInteger(p.deload) ? p.deload : null, applied: -1,
+    weeks: p.weeks.map(w => w.map(d => ({ name: String(d.name ?? 'Day'), items: d.items.map(num) }))) });
+  db.plan = data.plan ? cleanPlan(data.plan) : null;
+  db.plans = (data.plans || []).map(cleanPlan);
   const p = data.profile;
   db.profile = p && ['strength', 'muscle', 'tone', 'fatloss'].includes(p.goal) && Array.isArray(p.equipment) ? p : null;
   const b = data.body || {};
@@ -100,6 +109,6 @@ export function restore(data) {
   db.chat = Array.isArray(data.chat) ? data.chat.filter(m => ['user', 'assistant'].includes(m?.role) && typeof m.content === 'string') : [];
   db.settings = { units: data.settings.units, ai: db.settings.ai, lastBackup: data.exported };
   db.active = null;
-  save('settings', 'routines', 'workouts', 'profile', 'chat', 'active', 'body');
+  save('settings', 'routines', 'workouts', 'profile', 'chat', 'active', 'body', 'plan', 'plans');
   return db.workouts.length;
 }

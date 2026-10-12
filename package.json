@@ -4,7 +4,7 @@
   "type": "module",
   "description": "npm is only for the Capacitor Android shell; the web app itself has no build step.",
   "scripts": {
-    "test": "node progression.test.js && node ai.test.js && node store.test.js && node guess.test.js",
+    "test": "node progression.test.js && node ai.test.js && node store.test.js && node guess.test.js && node plan.test.js",
     "www": "node copy-web.js",
     "sync": "node copy-web.js && cap sync android"
   },

@@ -89,35 +89,39 @@ export function candidates(all, p) {
     && LEVELS.indexOf(e.level) <= LEVELS.indexOf(p.level));
 }
 
-export function planPrompt(list, p, about = '') {
+// A month (4 weeks) in one request. Each day keeps its muscle slots all month; the exercise in a slot can change week to week.
+export function planPrompt(list, p, about = '', history = '') {
   const g = GOALS[p.goal], perDay = Math.max(3, Math.min(9, Math.round(p.minutes / 9)));
   return [
-    { role: 'system', content: 'You are an experienced strength coach. You build weekly training plans using ONLY exercise ids from the list you are given, copied exactly. Reply with JSON only, no other text.' },
-    { role: 'user', content: `Build a weekly plan.
+    { role: 'system', content: 'You are an experienced strength coach. You build monthly training plans using ONLY exercise ids from the list you are given, copied exactly. Reply with JSON only, no other text.' },
+    { role: 'user', content: `Build a 4-week training plan (one month).
 Goal: ${g.label} (${g.repMin}-${g.repMax} reps; the app sets reps, you choose exercises, set counts and rest).
 Training days per week: ${p.days}. Minutes per session: ${p.minutes} (about ${perDay} exercises a day).
-Experience: ${p.level}.${about ? `
-Person: ${about}.` : ''}${p.avoid ? `\nAvoid or work around: ${p.avoid}.` : ''}
+Experience: ${p.level}.${about ? `\nPerson: ${about}.` : ''}${p.avoid ? `\nAvoid or work around: ${p.avoid}.` : ''}
+Structure: every week has the same ${p.days} days with the same names, and each day has the same slots in the same order. A slot works the same primary muscle all month, but swap the exercise in some slots from week to week for a different exercise that hits the same muscle, so the month works each muscle from different angles. Keep each day's first big compound lift for at least 2 weeks so progress can be tracked. Week 4 is a deload: the same exercises as week 3 with about half the sets.
 Rules: cover every major muscle group across the week; big compound lifts first in a day; 2-5 sets each;${p.goal === 'fatloss' ? ' pair exercises into supersets (set superset_with_next on the first of each pair);' : ''} name each day briefly (e.g. "Upper A", "Legs").
 Rest: give every exercise rest_seconds (30-300) suited to it and to this goal (typical for the goal: about ${g.rest}s). Heavy compound lifts need more (around 120-180 for strength work), isolation work and supersets less (around 45-75).
-Exercises marked "timed" are holds measured in seconds, not reps: give them "seconds" per set (e.g. 30-60) instead.
-Reply exactly in this shape:
-{"days":[{"name":"Upper A","exercises":[{"id":"<id from the list>","sets":3,"rest_seconds":90,"superset_with_next":false},{"id":"<a timed id>","sets":3,"seconds":45,"rest_seconds":60,"superset_with_next":false}]}],"notes":"2-3 sentences on how the week is split and how to progress"}
+Exercises marked "timed" are holds measured in seconds, not reps: give them "seconds" per set (e.g. 30-60) instead.${history ? `
+What they did before. Use it: keep or bring back exercises that progressed, rotate out ones that stalled, and you may reuse older exercises from earlier months:
+${history}` : ''}
+Reply exactly in this shape, with 4 entries in "weeks":
+{"weeks":[{"days":[{"name":"Upper A","exercises":[{"id":"<id from the list>","sets":3,"rest_seconds":90,"superset_with_next":false},{"id":"<a timed id>","sets":3,"seconds":45,"rest_seconds":60,"superset_with_next":false}]}]}],"notes":"2-3 sentences on how the month is built and how to progress"}
 
 Exercises (id | primary muscle | equipment | mechanic | timed?):
 ${list.map(e => `${e.id} | ${e.primaryMuscles[0] || ''} | ${e.equipment} | ${e.mechanic || ''}${isTimed(e) ? ' | timed' : ''}`).join('\n')}` },
   ];
 }
 
-// Turns the model's reply into routines' worth of days, keeping only exercises that exist.
+// Turns the model's reply into 4 weeks of days, keeping only exercises that exist. Short replies are padded by
+// repeating the last week; a plain {"days":[...]} reply is treated as one week.
 export function parsePlan(text, lib) {
   let json;
   try { json = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)); }
   catch { throw new Error('The AI didn\'t send back a readable plan. Try again.'); }
   const lower = Object.fromEntries(Object.values(lib).flatMap(e => [[e.id.toLowerCase(), e.id], [e.name.toLowerCase(), e.id]]));
   let dropped = 0;
-  const days = (Array.isArray(json.days) ? json.days : []).map(d => {
-    const items = (Array.isArray(d.exercises) ? d.exercises : []).flatMap(x => {
+  const parseDays = days => (Array.isArray(days) ? days : []).map(d => {
+    const items = (Array.isArray(d?.exercises) ? d.exercises : []).flatMap(x => {
       const id = lib[x?.id] ? x.id : lower[String(x?.id ?? '').toLowerCase()];
       if (!id) { dropped++; return []; }
       const item = { exId: id, sets: Math.max(1, Math.min(6, parseInt(x.sets) || 3)), ss: !!x.superset_with_next, rest: snapRest(x.rest_seconds) };
@@ -128,8 +132,10 @@ export function parsePlan(text, lib) {
       return [item];
     });
     if (items.length) items.at(-1).ss = false; // nothing after the last exercise to superset with
-    return { name: String(d.name || 'Day').slice(0, 40), items };
+    return { name: String(d?.name || 'Day').slice(0, 40), items };
   }).filter(d => d.items.length);
-  if (!days.length) throw new Error('The AI\'s plan didn\'t use any exercises from the library. Try again.');
-  return { days, notes: String(json.notes || ''), dropped };
+  const weeks = (Array.isArray(json.weeks) ? json.weeks.slice(0, 4).map(w => parseDays(w?.days)) : [parseDays(json.days)]).filter(w => w.length);
+  if (!weeks.length) throw new Error('The AI\'s plan didn\'t use any exercises from the library. Try again.');
+  while (weeks.length < 4) weeks.push(structuredClone(weeks.at(-1)));
+  return { weeks, notes: String(json.notes || ''), dropped };
 }
