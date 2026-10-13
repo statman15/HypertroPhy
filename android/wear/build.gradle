@@ -1,0 +1,51 @@
+apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
+
+android {
+    namespace = "com.statman15.hypertrophy"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.statman15.hypertrophy"
+        minSdkVersion 30
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        // Same scheme as the phone app: CI sets these from the run number.
+        versionCode((System.getenv("VERSION_CODE") ?: "1") as Integer)
+        versionName System.getenv("VERSION_NAME") ?: "dev"
+    }
+    signingConfigs {
+        release {
+            def ks = System.getenv("KEYSTORE_FILE")
+            if (ks) {
+                storeFile file(ks)
+                storeType "pkcs12"
+                storePassword System.getenv("KEYSTORE_PASSWORD")
+                keyAlias System.getenv("KEY_ALIAS") ?: "hypertrophy"
+                keyPassword System.getenv("KEYSTORE_PASSWORD")
+            }
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig System.getenv("KEYSTORE_FILE") ? signingConfigs.release : signingConfigs.debug
+            minifyEnabled false
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = "17" }
+    buildFeatures { compose true }
+}
+
+dependencies {
+    implementation 'androidx.activity:activity-compose:1.10.1'
+    implementation 'androidx.wear.compose:compose-material:1.4.1'
+    implementation 'androidx.wear.compose:compose-foundation:1.4.1'
+    implementation 'com.google.android.gms:play-services-wearable:19.0.0'
+    implementation 'androidx.health:health-services-client:1.0.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.9.0'
+    implementation 'com.google.guava:guava:33.4.0-android'
+}
