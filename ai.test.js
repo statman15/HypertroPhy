@@ -51,3 +51,13 @@ assert.equal(candidates(pool, prof).length, 3, 'no groups: everything');
 const libMuscles = new Set(JSON.parse((await import("node:fs")).readFileSync("data/exercises.json", "utf8")).flatMap(e => e.primaryMuscles));
 assert.deepEqual([...libMuscles].filter(m => !Object.values(MUSCLE_GROUPS).flat().includes(m)), ["neck"], "every library muscle except neck has a group");
 console.log('ai routine filter: all checks pass');
+
+const gp = (equipment) => ({ goal: 'muscle', level: 'beginner', equipment });
+const gx = [
+  { id: 'Chin', name: 'Chin-Up', primaryMuscles: ['lats'], equipment: 'body only', category: 'strength', level: 'beginner' },
+  { id: 'BenchDips', name: 'Bench Dips', primaryMuscles: ['triceps'], equipment: 'body only', category: 'strength', level: 'beginner' },
+  { id: 'Dips', name: 'Dips - Triceps Version', primaryMuscles: ['triceps'], equipment: 'body only', category: 'strength', level: 'beginner' },
+];
+assert.deepEqual(candidates(gx, gp(['body only'])).map(e => e.id), ['BenchDips'], 'no bar, no dip bars: only bench dips');
+assert.deepEqual(candidates(gx, gp(['body only', 'pull-up bar', 'dip bars'])).map(e => e.id), ['Chin', 'BenchDips', 'Dips']);
+console.log('ai gear filter: all checks pass');

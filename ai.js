@@ -2,7 +2,7 @@
 // Address, key and model live in settings.ai on this phone only.
 import { db } from './store.js';
 import { GOALS, TIME_RANGE } from './progression.js';
-import { isTimed } from './exercises.js';
+import { isTimed, gear } from './exercises.js';
 
 // Rest the AI picks per exercise, snapped to the app's rest-timer choices.
 const RESTS = [30, 45, 60, 90, 120, 180, 240, 300];
@@ -80,7 +80,7 @@ export async function chat(messages) {
 // --- Plan builder
 
 const LEVELS = ['beginner', 'intermediate', 'expert'];
-export const EQUIPMENT = ['barbell', 'dumbbell', 'machine', 'cable', 'kettlebells', 'bands', 'body only', 'e-z curl bar', 'medicine ball', 'exercise ball', 'other'];
+export const EQUIPMENT = ['barbell', 'dumbbell', 'machine', 'cable', 'kettlebells', 'bands', 'body only', 'pull-up bar', 'dip bars', 'e-z curl bar', 'medicine ball', 'exercise ball', 'other'];
 
 // Only exercises the person can do: their equipment, their level or easier, real training (no stretches).
 // Friendly muscle groups for a single focused routine, mapped to the library's primary muscles.
@@ -96,7 +96,7 @@ export const MUSCLE_GROUPS = {
 export function candidates(all, p, groups = []) {
   const types = ['strength', 'powerlifting', ...(p.level === 'expert' ? ['olympic weightlifting'] : []), ...(['fatloss', 'tone'].includes(p.goal) ? ['plyometrics'] : [])];
   const muscles = groups.flatMap(g => MUSCLE_GROUPS[g] || []);
-  return all.filter(e => p.equipment.includes(e.equipment) && types.includes(e.category)
+  return all.filter(e => p.equipment.includes(e.equipment) && (!gear(e) || p.equipment.includes(gear(e))) && types.includes(e.category)
     && LEVELS.indexOf(e.level) <= LEVELS.indexOf(p.level)
     && (!muscles.length || muscles.includes(e.primaryMuscles[0])));
 }

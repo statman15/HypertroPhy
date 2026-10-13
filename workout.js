@@ -72,7 +72,8 @@ ${backupDue() ? `<div class="card group nag"><b>Back up your workouts</b><p clas
     ${planCard()}
     <button class="pill wide" data-act="empty">Start Empty Workout</button>
     ${db.plan && !monthDone() ? '' : `<button class="pill wide quiet" data-act="plan">${icon('sparkle')}${db.plan ? 'Build Next Month' : 'Build a Month Plan with AI'}</button>`}
-    <div class="sec"><h2>Routines</h2><span><button class="text-btn" data-act="airoutine">${icon('sparkle')}AI</button><button class="text-btn" data-act="new">New Routine</button></span></div>
+    <div class="sec"><h2>Routines</h2></div>
+    <div class="routine-actions"><button class="pill quiet" data-act="airoutine">${icon('sparkle')}Build with AI</button><button class="pill plain" data-act="new">${icon('plus')}Create My Own</button></div>
     ${db.routines.length ? db.routines.map(r => `<div class="card group">
       <div class="card-top"><b>${esc(r.name)}${r.ai ? ` <small class="pr">${r.week ? `Week ${r.week | 0}` : 'AI plan'}</small>` : r.aiOne ? ' <small class="pr">AI</small>' : ''}</b><button class="text-btn" data-act="edit" data-id="${r.id}">Edit</button></div>
       <p class="a">${esc(r.items.map(it => name(it.exId)).join(', ') || 'No exercises yet')}</p>

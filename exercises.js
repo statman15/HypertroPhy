@@ -22,5 +22,12 @@ export function filter(list, { q = '', muscles = [], equip = [] }) {
 
 export const values = (list, key) => [...new Set(list.flatMap(e => e[key]))].sort();
 
+// Gear the data labels "body only"/"other": a bar to hang from, or dip bars. Loaded-tool exercises (e.g. cable pulldown) don't need it.
+export const gear = e => {
+  if (['barbell', 'dumbbell', 'machine', 'cable', 'kettlebells', 'e-z curl bar'].includes(e.equipment)) return null;
+  if (/pull-?up|chin-?up|hanging|muscle.?up/i.test(e.name) || /inverted row/i.test(e.name)) return 'pull-up bar'; // inverted row: any low bar works
+  return /\bdips?\b/i.test(e.name) && !/bench/i.test(e.name) ? 'dip bars' : null;
+};
+
 // Held for time rather than counted in reps: isometric holds and stretches (force "static"), cardio, carries.
 export const isTimed = e => !!e && (e.force === 'static' || e.category === 'cardio' || /farmer|carry|yoke walk|wall sit/i.test(e.name));

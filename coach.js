@@ -134,7 +134,9 @@ export function openRoutineBuilder(done) {
       <label>Minutes<select name="minutes">${[20, 30, 45, 60, 75, 90].map(m => opt(m, m, Math.min(p.minutes, 90))).join('')}</select></label>
     </div>
     <label>Pace<select name="pace">${opt('best', 'Best results: longer rest on big lifts', p.pace || 'best')}${opt('quick', 'Time-efficient: shorter rest, more supersets', p.pace)}</select></label>
-    <p class="muted">Uses your equipment and experience from your plan answers (${esc(p.level)}, ${p.equipment.length} kinds of equipment).</p>
+    <fieldset><legend>Equipment you have</legend><div class="checks">${EQUIPMENT.map(e =>
+      `<label><input type="checkbox" name="equipment" value="${e}"${p.equipment.includes(e) ? ' checked' : ''}>${cap(e)}</label>`).join('')}</div></fieldset>
+    <p class="muted">Uses your experience (${esc(p.level)}) from your plan answers.</p>
     <button class="pill wide" type="submit">Build Routine</button>
     <p class="muted" id="routineMsg" role="status"></p>
   </form>`);
@@ -142,8 +144,11 @@ export function openRoutineBuilder(done) {
     ev.preventDefault();
     const f = new FormData(ev.target), btn = ev.target.querySelector('[type=submit]'), groups = f.getAll('groups');
     if (!groups.length) return void ($('#routineMsg').textContent = 'Tick at least one muscle group.');
-    const prof = { ...p, goal: f.get('goal'), pace: f.get('pace') }, list = candidates(all, prof, groups);
+    const equipment = f.getAll('equipment');
+    if (!equipment.length) return void ($('#routineMsg').textContent = 'Tick the equipment you have.');
+    const prof = { ...p, goal: f.get('goal'), pace: f.get('pace'), equipment }, list = candidates(all, prof, groups);
     if (list.length < 3) return void ($('#routineMsg').textContent = 'Not enough exercises for those muscles with your equipment. Tick more groups or more equipment in Build a Month Plan.');
+    db.profile = { ...p, equipment, pace: prof.pace }; save('profile'); // remember for next time; the plan's goal stays
     btn.disabled = true; btn.textContent = 'Building…';
     $('#routineMsg').textContent = '';
     try {
