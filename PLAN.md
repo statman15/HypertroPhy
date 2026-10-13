@@ -110,7 +110,7 @@ android/              Capacitor project (generated)
 - Each exercise comes back with a short **why**, shown in the previews only (not saved into routines).
 - Month plans keep the main lifts all month and rotate accessories every week or two.
 
-## Phase 9: Galaxy Watch (Wear OS) companion — spec (2026-10-12)
+## Phase 9: Galaxy Watch (Wear OS) companion (2026-10-12) ✅ built in v1.0.13; first real-watch test pending
 Decisions: Wear OS first (Chris: Galaxy Watch). The **phone is the brain**: the phone app holds all data and logic, and the watch shows the workout and sends taps. The watch **records heart rate** (live, plus avg/max saved per workout). The watch app is **installed from this PC over Wi-Fi** (Wireless debugging + `adb install`); CI attaches the watch APK to each release. Apple Watch (wife) and Garmin (brother, Android phone) are parked with notes.
 
 **Modules**
