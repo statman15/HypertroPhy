@@ -110,6 +110,32 @@ android/              Capacitor project (generated)
 - Each exercise comes back with a short **why**, shown in the previews only (not saved into routines).
 - Month plans keep the main lifts all month and rotate accessories every week or two.
 
+## Phase 9: Galaxy Watch (Wear OS) companion — spec (2026-10-12)
+Decisions: Wear OS first (Chris: Galaxy Watch). The **phone is the brain**: the phone app holds all data and logic, and the watch shows the workout and sends taps. The watch **records heart rate** (live, plus avg/max saved per workout). The watch app is **installed from this PC over Wi-Fi** (Wireless debugging + `adb install`); CI attaches the watch APK to each release. Apple Watch (wife) and Garmin (brother, Android phone) are parked with notes.
+
+**Modules**
+- `android/wear/`: Kotlin + Compose for Wear OS. `applicationId com.statman15.hypertrophy` (must match the phone app for the Data Layer), minSdk 30 (Wear OS 3+, Galaxy Watch4 and newer), signed with the same release keystore. Uses `play-services-wearable` and Health Services (`androidx.health:health-services-client`).
+- Phone: a local Capacitor plugin `WearBridge` (Java, in `android/app`, registered in `MainActivity`) using `play-services-wearable`. It's a no-op where there's no watch, no Play services, or on the web. JS lives in `watch.js`.
+
+**Protocol v1 (Wearable Data Layer)**
+- Phone → watch state: DataItem at path `/hypertrophy/state`, keys `json` (String) and `t` (Long, a timestamp so every push counts as a change), sent urgent.
+  - Idle: `{"v":1,"active":false,"units":"lb","routines":[{"id":"...","name":"Upper A"}]}`
+  - Active: `{"v":1,"active":true,"units":"lb","name":"Push Day","started":<ms>,"exercise":"Bench Press","set":"Set 2 of 4" | "Warm-up 1 of 3","target":"135 lb × 8" | "45 s hold","timed":false,"restEnd":<ms or 0>,"holdEnd":<ms or 0>,"done":5,"total":14,"next":"Incline DB Press" | null}`
+  - "Current set" means the first set not yet checked off, going through exercises in order, sets in order.
+- Watch → phone actions: MessageClient path `/hypertrophy/action`, UTF-8 JSON: `{"type":"start","routineId":"<id>"|"empty"}`, `{"type":"setDone"}` (for a timed set it starts the hold timer instead), `{"type":"skipRest"}`, `{"type":"addRest","seconds":15}`, `{"type":"finish"}`.
+- Watch → phone heart rate: MessageClient path `/hypertrophy/hr`, `{"bpm":<int>,"t":<ms>}`, about every 5 s while a workout is active.
+- Watch → phone hello: MessageClient `/hypertrophy/hello` `{}` on launch; the phone answers by pushing state.
+
+**Watch app**
+- Screens: Not connected ("Open HypertroPhy on your phone"); Idle (list of routines plus "Empty workout" → `start`); Active (exercise, set label, target, big **Set done** button, live HR, elapsed time; during rest a countdown from `restEnd` with **Skip rest** and **+15 s**, and a strong vibration at 0; during a hold a countdown from `holdEnd`); a Finish action behind a confirm.
+- Heart rate: a Health Services `ExerciseClient` session (strength training) from `active:true` until `active:false`, so the sensor keeps running with the screen off (ongoing activity / foreground as Health Services requires). Needs the `BODY_SENSORS` and `ACTIVITY_RECOGNITION` permissions, asked on first workout.
+
+**Phone app**
+- `watch.js`: `watchState()` (pure, unit-tested) builds the state JSON from the active workout or the routines. It's pushed on app start, on every change to the active workout, when routines change, and on `hello`. Actions map to the workout functions: start routine or empty, check the current set (or start its hold), skip or adjust rest, finish.
+- Heart rate: `db.active.hr = {sum,n,max}`. On finish the workout saves `hr: {avg, max}`. History detail shows "♥ avg 128 · max 162". Calories use the Keytel (2005) heart-rate formula when avg HR, age, sex and weight are known, else the MET 5 estimate. Restore whitelists `hr` as numbers.
+
+**Install (per update):** on the watch, Developer options → ADB debugging + Wireless debugging; pair once with `adb pair <ip:port> <code>`, then `adb connect <ip:port>` and `adb install -r HypertroPhy-watch-<ver>.apk`.
+
 ## Android build notes
 - Web files are copied into `www/` by `npm run sync` (copy-web.js + cap sync); never edit `www/` or `android/app/src/main/assets` by hand.
 - Keystore: `~/hypertrophy-keystore` (release.p12, password.txt, release.p12.b64), also in repo secrets KEYSTORE_B64 / KEYSTORE_PASSWORD. **Back the folder up to the password manager**: every future APK must be signed with it or updates won't install.

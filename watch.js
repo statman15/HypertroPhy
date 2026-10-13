@@ -1,0 +1,54 @@
+// Galaxy Watch link (protocol v1, PLAN.md Phase 9): pushes the workout to the watch and handles what it sends back.
+// The Android app has the WearBridge plugin; everywhere else this does nothing.
+import { db, save } from './store.js';
+import { num } from './ui.js';
+
+// The state JSON the watch shows. Pure: ctx = { name(exId), timed(item), setTarget(item, j) -> {w, r} } comes from workout.js.
+export function watchState(active, routines, units, ctx) {
+  if (!active) return { v: 1, active: false, units, routines: routines.map(r => ({ id: r.id, name: String(r.name) })) };
+  const all = active.items.flatMap((it, i) => it.sets.map((s, j) => ({ it, i, j, s })));
+  const cur = all.find(x => !x.s.done);
+  const base = { v: 1, active: true, units, name: String(active.name), started: active.start, restEnd: active.restEnd || 0, holdEnd: active.hold?.end || 0,
+    done: all.filter(x => x.s.done).length, total: all.length };
+  if (!cur) return { ...base, exercise: '', set: 'All sets done', target: '', timed: false, next: null };
+  const { it, i, j, s } = cur, T = !!ctx.timed(it), wu = !!s.wu, of = it.sets.filter(x => !!x.wu === wu);
+  const { w, r } = ctx.setTarget(it, j), k = it.sets.slice(0, j).filter(x => !!x.wu === wu).length + 1;
+  const next = active.items.slice(i + 1).find(x => x.sets.some(y => !y.done));
+  return { ...base, exercise: ctx.name(it.exId), timed: T, set: `${wu ? 'Warm-up' : 'Set'} ${k} of ${of.length}`,
+    target: T ? `${r} s hold` : w > 0 ? `${num(w)} ${units} × ${r}` : `${r} reps`, next: next ? ctx.name(next.exId) : null };
+}
+
+// Wiring: wk is the workout.js module (passed in so this file stays importable from Node tests).
+export function init(wk) {
+  const plugin = window.Capacitor?.isNativePlatform?.() && window.Capacitor.Plugins.WearBridge;
+  if (!plugin) return;
+  let timer, lastHr = 0;
+  const push = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => { try { plugin.pushState({ json: JSON.stringify(watchState(db.active, db.routines, db.settings.units, wk.watchCtx)) }).catch(() => {}); } catch {} }, 300);
+  };
+  wk.hooks.change = push;
+  plugin.addListener('hello', push);
+  plugin.addListener('action', a => action(wk, a));
+  plugin.addListener('hr', h => {
+    const a = db.active, bpm = Math.round(+h?.bpm);
+    if (!a || !(bpm > 30 && bpm < 250)) return;
+    a.hr ||= { sum: 0, n: 0, max: 0 };
+    a.hr.sum += bpm; a.hr.n++; a.hr.max = Math.max(a.hr.max, bpm);
+    if (Date.now() - lastHr > 30000) { lastHr = Date.now(); save('active'); }
+  });
+  push();
+}
+
+// Exported so it can be driven without a watch (the same code the plugin's action event runs).
+export function action(wk, a) {
+  const act = db.active;
+  if (a?.type === 'start') wk.watchStart(String(a.routineId));
+  else if (!act) return;
+  else if (a.type === 'setDone') {
+    const cur = act.items.flatMap((it, i) => it.sets.map((s, j) => ({ i, j, s }))).find(x => !x.s.done);
+    if (cur || act.hold) wk.watchSetDone(cur?.i, cur?.j);
+  } else if (a.type === 'skipRest') wk.watchRest(0);
+  else if (a.type === 'addRest') wk.watchRest(Math.max(1, Math.min(600, +a.seconds || 15)));
+  else if (a.type === 'finish') wk.watchFinish();
+}

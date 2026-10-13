@@ -51,6 +51,7 @@ export function detail(w) {
   const u = db.settings.units;
   const body = sheet(`<h2 id="sheetTitle">${esc(w.name)}</h2>
     <p class="muted">${day(w.start)} · ${mins(w)} · ${num(volume(w.items))} ${u}${cal(w)}</p>
+    ${Number.isFinite(w.hr?.avg) ? `<p class="muted">♥ avg ${Math.round(w.hr.avg)} · max ${Math.round(+w.hr.max) || 0}</p>` : ''}
     ${w.items.map(it => `<h3>${esc(name(it.exId))}</h3><ol class="group setlist">${it.sets.map(s =>
       `<li${s.wu ? ' class="wu"' : ''}><span>${setText(s, isT(it), u)}</span>${s.pr ? `<span class="pr">${icon('trophy')}PR</span>` : ''}</li>`).join('')}</ol>`).join('')}
     ${kcal(w) ? '<p class="muted">Calories are a rough estimate from your body weight and the workout\'s length.</p>' : ''}

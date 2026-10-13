@@ -43,6 +43,25 @@ const withBody = JSON.parse(JSON.stringify(backup()));
 withBody.body.sex = '<script>'; withBody.body.weights.push({ t: 'x', w: 5 }, { t: 2, w: -1 });
 restore(withBody);
 assert.deepEqual(db.body, { sex: '', birthYear: 1990, heightCm: 180, weights: [{ t: 1, w: 198.4 }] }, 'bad body fields are dropped');
+// Heart rate: Keytel formula when avg HR, sex, age and weight are known; the HR field is whitelisted on restore
+const yr = new Date().getFullYear();
+db.body.birthYear = yr - 30; db.body.sex = 'male';
+db.workouts[0].hr = { avg: 130, max: 160 };
+assert.equal(kcal(db.workouts[0]), Math.round((-55.0969 + 0.6309 * 130 + 0.1988 * 90 + 0.2017 * 30) / 4.184 * 60), 'male Keytel, 1 h');
+db.body.sex = 'female';
+assert.equal(kcal(db.workouts[0]), Math.round((-20.4022 + 0.4472 * 130 - 0.1263 * 90 + 0.074 * 30) / 4.184 * 60), 'female Keytel, 1 h');
+db.body.sex = '';
+assert.equal(kcal(db.workouts[0]), 450, 'no sex: back to MET 5');
+db.body.sex = 'male'; db.workouts[0].hr = { avg: 20, max: 30 };
+assert.equal(kcal(db.workouts[0]), 0, 'never negative');
+db.workouts[0].hr = { avg: 130, max: 160 };
+const hrFile = JSON.parse(JSON.stringify(backup()));
+restore(hrFile);
+assert.deepEqual(db.workouts[0].hr, { avg: 130, max: 160 });
+hrFile.workouts[0].hr = { avg: '<b>', max: 160 };
+restore(hrFile);
+assert.equal(db.workouts[0].hr, undefined, 'non-numeric hr is dropped');
+restore(JSON.parse(JSON.stringify(withBody)));
 setUnits('kg');
 assert.equal(db.body.weights[0].w, 90, 'weigh-ins convert with the units');
 

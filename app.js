@@ -6,6 +6,7 @@ import * as workout from './workout.js';
 import * as history from './history.js';
 import * as coach from './coach.js';
 import * as ai from './ai.js';
+import * as watch from './watch.js';
 const { PRESETS, conn, models, chat } = ai;
 
 const img = (path, alt = '') => path ? `<img src="${photo(path)}" crossorigin="anonymous" loading="lazy" alt="${alt}">` : '';
@@ -208,6 +209,7 @@ $('#settings').addEventListener('input', ev => {
 
 workout.init(byId, pick, w => { go('history'); history.detail(w); }, id => show(byId[id]), coach.openPlanBuilder, coach.openRoutineBuilder);
 history.init(byId);
+watch.init(workout);
 coach.init(all, byId);
 go('workout');
 
@@ -244,7 +246,7 @@ async function checkUpdate() {
   try {
     const { version } = await (await fetch('version.json')).json();
     const rel = await (await fetch('https://api.github.com/repos/statman15/HypertroPhy/releases/latest')).json();
-    const latest = String(rel.tag_name || '').replace(/^v/, ''), apk = rel.assets?.find(a => a.name.endsWith('.apk'))?.browser_download_url;
+    const latest = String(rel.tag_name || '').replace(/^v/, ''), apk = rel.assets?.find(a => /^HypertroPhy-(?!.*watch).*\.apk$/.test(a.name))?.browser_download_url;
     if (version === 'dev' || !apk || !newer(latest, version) || localStorage.getItem('skipUpdate') === latest) return;
     $('#updateText').textContent = `Update available: ${latest}`;
     $('#updateGo').onclick = async ev => {

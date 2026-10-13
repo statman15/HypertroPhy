@@ -59,8 +59,17 @@ export const age = () => db.body.birthYear ? new Date().getFullYear() - db.body.
 export const toKg = w => db.settings.units === 'kg' ? w : w * 0.45359237;
 
 // Estimated calories for a workout: MET 5 (moderate-to-vigorous weight training) × kg × hours, capped at 3 hours.
-// ponytail: one MET for every workout; per-exercise METs or heart rate if the estimate ever matters.
-export const kcal = w => bodyweight() ? Math.round(5 * toKg(bodyweight()) * Math.min(3, (w.end - w.start) / 3.6e6)) : 0;
+// With the watch's average heart rate (and sex, age, weight known) it's the Keytel 2005 equations instead.
+// ponytail: one MET for every workout without heart rate; per-exercise METs if the estimate ever matters.
+export const kcal = w => {
+  if (!bodyweight()) return 0;
+  const hours = Math.min(3, (w.end - w.start) / 3.6e6), kg = toKg(bodyweight()), hr = w.hr?.avg, a = age();
+  if (hr > 0 && a && ['male', 'female'].includes(db.body.sex)) {
+    const perMin = (db.body.sex === 'male' ? -55.0969 + 0.6309 * hr + 0.1988 * kg + 0.2017 * a : -20.4022 + 0.4472 * hr - 0.1263 * kg + 0.074 * a) / 4.184;
+    return Math.max(0, Math.round(perMin * hours * 60));
+  }
+  return Math.round(5 * kg * hours);
+};
 
 // A line for the AI: "male, 34, 180 cm, 82 kg" (whatever is known).
 export function aboutYou() {
@@ -91,7 +100,7 @@ export function restore(data) {
     && (data.plan == null || planOk(data.plan)) && (data.plans == null || Array.isArray(data.plans) && data.plans.every(planOk));
   if (!ok) throw new Error('That file isn\'t a HypertroPhy backup, or it\'s damaged.');
   const num = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, ['w', 'r', 'sets', 'repMin', 'repMax', 'rest'].includes(k) && v !== '' && v != null ? +v : v]));
-  db.workouts = data.workouts.map(w => ({ ...w, name: String(w.name ?? 'Workout'), items: w.items.map(it => ({ ...num(it), sets: it.sets.map(num) })) }));
+  db.workouts = data.workouts.map(({ hr, ...w }) => ({ ...w, ...(Number.isFinite(hr?.avg) && Number.isFinite(hr?.max) && { hr: { avg: hr.avg, max: hr.max } }), name: String(w.name ?? 'Workout'), items: w.items.map(it => ({ ...num(it), sets: it.sets.map(num) })) }));
   db.routines = data.routines.map(r => ({ id: r.id, name: String(r.name ?? 'Routine'), ...(r.ai && { ai: true }), ...(r.aiOne && { aiOne: true }), ...(Number.isInteger(r.week) && { week: r.week }), items: r.items.map(num) }));
   const cleanPlan = p => ({ start: p.start, notes: String(p.notes ?? ''), deload: Number.isInteger(p.deload) ? p.deload : null, applied: -1,
     weeks: p.weeks.map(w => w.map(d => ({ name: String(d.name ?? 'Day'), items: d.items.map(num) }))) });

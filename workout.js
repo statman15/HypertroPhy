@@ -59,11 +59,46 @@ export function init(byId, picker, finished, showInfo, planBuilder, routineBuild
   keepAwake();
 }
 
+// watch.js sets change(): every render follows a change to the workout or the routines, so the watch hears about it.
+export const hooks = { change() {} };
+
 export function render() {
   if (!db.active && !editing) applyWeek(); // a new Monday swaps in that week's AI routines
   root().innerHTML = editing ? editorHtml() : db.active ? activeHtml() : idleHtml();
   tick();
+  hooks.change();
 }
+
+// --- For the watch (watch.js): what a set shows, and the actions the watch can send.
+export const watchCtx = { name, timed: it => timed(it), setTarget };
+// Weight and reps (or seconds) for set j: what's typed, else the same placeholder the logger shows.
+function setTarget(it, j) {
+  const s = it.sets[j], p = s.wu ? null : hint(it, workIdx(it, j));
+  return { w: s.w !== '' ? parse(s.w) || 0 : +(p?.w || 0), r: s.r !== '' ? parseInt(s.r) || 0 : s.wu ? 0 : +(p?.r ?? firstR(it)) };
+}
+function changed() { save('active'); syncRestNote(); render(); }
+export function watchStart(id) {
+  const r = id === 'empty' ? { name: 'Workout', items: [] } : db.routines.find(r => r.id === id);
+  if (!r || db.active) return;
+  editing = null;
+  start(r);
+  changed();
+}
+export function watchSetDone(i, j) {
+  const a = db.active;
+  if (!a) return;
+  if (a.hold) return completeHold(Math.max(1, Math.round((Date.now() - a.hold.start) / 1000)));
+  if (timed(a.items[i])) startHold(i, j);
+  else if (!check(i, j)) return;
+  changed();
+}
+export function watchRest(seconds) { // 0 skips the rest, else adds seconds
+  const a = db.active;
+  if (!a) return;
+  a.restEnd = seconds > 0 ? Math.max(a.restEnd || 0, Date.now()) + Math.min(seconds, 600) * 1000 : 0;
+  changed();
+}
+export const watchFinish = () => db.active && finish(true);
 
 function idleHtml() {
   return `<div class="head"><h1>Workout</h1></div>
@@ -360,13 +395,13 @@ function check(i, j) {
   return true;
 }
 
-function finish() {
+function finish(quiet) {
   const a = db.active;
   const items = a.items
     .map(it => ({ exId: it.exId, rest: it.rest, ss: it.ss, ...(timed(it) && { timed: true }), ...(it.deload && { deload: true }), repMin: it.repMin, repMax: it.repMax, sets: it.sets.filter(s => s.done).map(s => ({ w: s.w, r: s.r, ...(s.wu && { wu: true }) })) }))
     .filter(it => it.sets.length);
   if (!items.length) {
-    if (!confirm('No sets are checked off. Discard this workout?')) return;
+    if (!quiet && !confirm('No sets are checked off. Discard this workout?')) return;
     db.active = null; save('active'); keepAwake(); return render();
   }
   // A PR is a set whose estimated 1RM beats everything logged before it (needs earlier history to count);
@@ -376,7 +411,7 @@ function finish() {
     let best = it.timed ? rec?.reps : rec?.best;
     if (best) for (const s of it.sets) if (!s.wu && score(s) > best) { s.pr = true; best = score(s); }
   }
-  const w = { id: a.id, name: a.name, routineId: a.routineId, start: a.start, end: Date.now(), items };
+  const w = { id: a.id, name: a.name, routineId: a.routineId, start: a.start, end: Date.now(), items, ...(a.hr?.n > 0 && { hr: { avg: Math.round(a.hr.sum / a.hr.n), max: Math.round(a.hr.max) } }) };
   db.workouts.unshift(w);
   db.active = null;
   save('workouts', 'active');
