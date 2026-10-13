@@ -101,6 +101,30 @@ export function candidates(all, p, groups = []) {
     && (!muscles.length || muscles.includes(e.primaryMuscles[0])));
 }
 
+// Programming rules from the 2026 ACSM resistance-training position stand and recent meta-analyses (see EVIDENCE.md).
+// Shared by month plans and single routines. p.pace: 'best' (evidence-based rest) or 'quick' (shorter rest, more supersets).
+function guide(p) {
+  const quick = p.pace === 'quick', beginner = p.level === 'beginner';
+  const goal = {
+    strength: 'Goal strength: the lifts they care about early in each session, heavier loads, longer rest; 2-5 sets on those lifts.',
+    muscle: 'Goal muscle: moderate reps, volume toward the upper end for the muscles they want most.',
+    tone: 'Goal "toned" means some muscle gain plus fat loss: train like muscle gain at moderate volume.',
+    fatloss: 'Goal fat loss: lifting here keeps muscle while they diet, so keep volume moderate rather than adding more; supersets of opposing muscles are welcome. Fat loss itself comes from diet and daily activity.',
+  }[p.goal] || '';
+  return `Programming rules (evidence-based; follow them):
+- Volume: about ${beginner ? '6-10' : '10-16'} hard sets per muscle per week, counting a compound's secondary muscles as half a set. Spread it so each muscle is trained about twice a week where the schedule allows.
+- Split: 2 days: full body. 3 days: full body or upper/lower. 4-6 days: upper/lower or push/pull/legs.${beginner ? ' Beginners: favour full body and stable, simple exercises (machines, dumbbells) while they learn technique.' : ''}
+- Order: each day starts with the heaviest compound for its main muscle, then other compounds, then isolation. Across the week cover squat, hinge, horizontal and vertical push, horizontal and vertical pull, and core or a carry.
+- Selection: favour full range of motion and exercises that load the muscle at long lengths (e.g. Romanian deadlift, incline curl, overhead triceps extension); add single-arm or single-leg work where useful.
+- Sets: 2-4 per exercise.
+- Rest (rest_seconds): ${quick
+    ? 'time-efficient pace: heavy compounds 90-120, other compounds 60-90, isolation 45-60. Save time by pairing opposing muscles as supersets (e.g. press + row, curl + pushdown); never pair two exercises for the same muscle or grip.'
+    : 'best-results pace: heavy compounds 120-180 (180+ for heavy strength sets), other compounds 90-120, isolation 60-90' + (p.goal === 'fatloss' ? ', supersets of opposing muscles 45-60' : '') + '. Longer rest on big lifts keeps reps and load up on later sets.'}
+- Effort: most sets end 1-3 reps short of failure${beginner ? ' (beginners about 3 short while learning)' : ''}; never take heavy barbell lifts to failure.
+- ${goal}
+- why: give every exercise a "why" of at most 12 words saying why it is there and why that rest, e.g. "Main quad builder; long rest keeps reps up on heavy sets".`;
+}
+
 // One session focused on the chosen muscle groups. Same reply shape as a one-week plan, so parsePlan reads it.
 export function routinePrompt(list, p, groups, minutes, about = '', history = '') {
   const g = GOALS[p.goal], count = Math.max(3, Math.min(9, Math.round(minutes / 9)));
@@ -109,13 +133,13 @@ export function routinePrompt(list, p, groups, minutes, about = '', history = ''
     { role: 'user', content: `Build ONE workout session focused on: ${groups.join(', ')}.
 Goal: ${g.label} (${g.repMin}-${g.repMax} reps; the app sets reps, you choose exercises, set counts and rest).
 About ${minutes} minutes: ${count} exercises. Experience: ${p.level}.${about ? `\nPerson: ${about}.` : ''}${p.avoid ? `\nAvoid or work around: ${p.avoid}.` : ''}
-Rules: split the work fairly between the chosen groups; big compound lifts first; for each group use exercises that hit it from different angles; 2-5 sets each;${p.goal === 'fatloss' ? ' pair exercises into supersets (set superset_with_next on the first of each pair);' : ''} give the session a short name (e.g. "Chest & Triceps").
-Rest: give every exercise rest_seconds (30-300) suited to it and to this goal (typical: about ${g.rest}s); heavy compounds more, isolation and supersets less.
+Session: split the work fairly between the chosen groups and hit each from different angles; give the session a short name (e.g. "Chest & Triceps"). Mark supersets with superset_with_next on the first exercise of each pair.
+${guide(p)}
 Exercises marked "timed" are holds measured in seconds: give them "seconds" per set instead of reps.${history ? `
 What they did before (favour lifts that are progressing, and you may vary stalled ones):
 ${history}` : ''}
 Reply exactly in this shape:
-{"days":[{"name":"Chest & Triceps","exercises":[{"id":"<id from the list>","sets":3,"rest_seconds":90,"superset_with_next":false}]}],"notes":"1-2 sentences on the session"}
+{"days":[{"name":"Chest & Triceps","exercises":[{"id":"<id from the list>","sets":3,"rest_seconds":150,"superset_with_next":false,"why":"Main chest builder; long rest keeps heavy reps up"}]}],"notes":"1-2 sentences on the session"}
 
 Exercises (id | primary muscle | equipment | mechanic | timed?):
 ${list.map(e => `${e.id} | ${e.primaryMuscles[0] || ''} | ${e.equipment} | ${e.mechanic || ''}${isTimed(e) ? ' | timed' : ''}`).join('\n')}` },
@@ -131,14 +155,13 @@ export function planPrompt(list, p, about = '', history = '') {
 Goal: ${g.label} (${g.repMin}-${g.repMax} reps; the app sets reps, you choose exercises, set counts and rest).
 Training days per week: ${p.days}. Minutes per session: ${p.minutes} (about ${perDay} exercises a day).
 Experience: ${p.level}.${about ? `\nPerson: ${about}.` : ''}${p.avoid ? `\nAvoid or work around: ${p.avoid}.` : ''}
-Structure: every week has the same ${p.days} days with the same names, and each day has the same slots in the same order. A slot works the same primary muscle all month, but swap the exercise in some slots from week to week for a different exercise that hits the same muscle, so the month works each muscle from different angles. Keep each day's first big compound lift for at least 2 weeks so progress can be tracked. Week 4 is a deload: the same exercises as week 3 with about half the sets.
-Rules: cover every major muscle group across the week; big compound lifts first in a day; 2-5 sets each;${p.goal === 'fatloss' ? ' pair exercises into supersets (set superset_with_next on the first of each pair);' : ''} name each day briefly (e.g. "Upper A", "Legs").
-Rest: give every exercise rest_seconds (30-300) suited to it and to this goal (typical for the goal: about ${g.rest}s). Heavy compound lifts need more (around 120-180 for strength work), isolation work and supersets less (around 45-75).
+Structure: every week has the same ${p.days} days with the same names, and each day has the same slots in the same order. A slot works the same primary muscle all month. Keep each day's main compound lifts the same all month so progress can be tracked; rotate the accessory slots every week or two to a different exercise for the same muscle (another angle, tool or grip), so the month works each muscle more completely. Week 4 is a deload: the same exercises as week 3 with about half the sets, sets ending 3 or more reps short of failure. Name each day briefly (e.g. "Upper A", "Legs"). Mark supersets with superset_with_next on the first exercise of each pair.
+${guide(p)}
 Exercises marked "timed" are holds measured in seconds, not reps: give them "seconds" per set (e.g. 30-60) instead.${history ? `
 What they did before. Use it: keep or bring back exercises that progressed, rotate out ones that stalled, and you may reuse older exercises from earlier months:
 ${history}` : ''}
 Reply exactly in this shape, with 4 entries in "weeks":
-{"weeks":[{"days":[{"name":"Upper A","exercises":[{"id":"<id from the list>","sets":3,"rest_seconds":90,"superset_with_next":false},{"id":"<a timed id>","sets":3,"seconds":45,"rest_seconds":60,"superset_with_next":false}]}]}],"notes":"2-3 sentences on how the month is built and how to progress"}
+{"weeks":[{"days":[{"name":"Upper A","exercises":[{"id":"<id from the list>","sets":3,"rest_seconds":150,"superset_with_next":false,"why":"Main press; long rest keeps heavy reps up"},{"id":"<a timed id>","sets":3,"seconds":45,"rest_seconds":60,"superset_with_next":false,"why":"Core bracing for heavier lifts"}]}]}],"notes":"2-3 sentences on how the month is built and how to progress"}
 
 Exercises (id | primary muscle | equipment | mechanic | timed?):
 ${list.map(e => `${e.id} | ${e.primaryMuscles[0] || ''} | ${e.equipment} | ${e.mechanic || ''}${isTimed(e) ? ' | timed' : ''}`).join('\n')}` },
@@ -158,6 +181,7 @@ export function parsePlan(text, lib) {
       const id = lib[x?.id] ? x.id : lower[String(x?.id ?? '').toLowerCase()];
       if (!id) { dropped++; return []; }
       const item = { exId: id, sets: Math.max(1, Math.min(6, parseInt(x.sets) || 3)), ss: !!x.superset_with_next, rest: snapRest(x.rest_seconds) };
+      if (x.why) item.why = String(x.why).slice(0, 100); // shown in the preview only
       if (isTimed(lib[id])) {
         const s = Math.max(10, Math.min(600, parseInt(x.seconds) || TIME_RANGE.repMin));
         Object.assign(item, { timed: true, repMin: s, repMax: s + 15 });

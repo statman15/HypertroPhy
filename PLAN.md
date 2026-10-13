@@ -104,6 +104,12 @@ android/              Capacitor project (generated)
 - `candidates(all, profile, groups)` keeps only those groups' primary muscles; `routinePrompt` asks for one session in the one-week shape, so `parsePlan` reads it. Recent progress (`pastMonths`) goes along too.
 - Saved as your own routine tagged **AI** (`aiOne: true`, not `ai`), so the Monday month-plan switch never replaces it.
 
+## Evidence-based AI prompts (2026-10-12) ✅
+- Both prompts share `guide()` in ai.js. Its rules for weekly sets per muscle, frequency, splits, exercise order and selection, rest, effort and per-goal notes come from the 2026 ACSM position stand and recent meta-analyses; sources and evidence strength are in `EVIDENCE.md`.
+- **Pace** (in both builders, saved in the profile): Best results (heavy compounds 2–3 min rest) or Time-efficient (shorter rest, opposing-muscle supersets). The long rests on big lifts are intentional under Best results.
+- Each exercise comes back with a short **why**, shown in the previews only (not saved into routines).
+- Month plans keep the main lifts all month and rotate accessories every week or two.
+
 ## Android build notes
 - Web files are copied into `www/` by `npm run sync` (copy-web.js + cap sync); never edit `www/` or `android/app/src/main/assets` by hand.
 - Keystore: `~/hypertrophy-keystore` (release.p12, password.txt, release.p12.b64), also in repo secrets KEYSTORE_B64 / KEYSTORE_PASSWORD. **Back the folder up to the password manager**: every future APK must be signed with it or updates won't install.

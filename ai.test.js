@@ -28,6 +28,10 @@ const m = parsePlan(JSON.stringify({ weeks: [1, 2, 3, 4, 5].map(n => ({ days: [{
 assert.equal(m.weeks.length, 4, "never more than 4 weeks");
 assert.deepEqual(m.weeks.map(w => w[0].items[0].exId), ["Pullups", "Barbell_Squat", "Pullups", "Barbell_Squat"], "each week keeps its own exercises");
 
+const w = parsePlan(JSON.stringify({ days: [{ name: "A", exercises: [{ id: "Pullups", sets: 3, why: "x".repeat(300) }, { id: "Barbell_Squat", sets: 3 }] }] }), lib);
+assert.equal(w.weeks[0][0].items[0].why.length, 100, "why is kept, capped at 100 characters");
+assert.equal("why" in w.weeks[0][0].items[1], false, "no why, no field");
+
 assert.equal(snapRest(0), null);
 assert.equal(snapRest(20), 30);
 assert.equal(snapRest(1000), 300);

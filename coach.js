@@ -98,6 +98,7 @@ export function openPlanBuilder(done) {
       <label>Days a week<select name="days">${[2, 3, 4, 5, 6].map(d => opt(d, d, p.days)).join('')}</select></label>
       <label>Minutes<select name="minutes">${[30, 45, 60, 75, 90].map(m => opt(m, m, p.minutes)).join('')}</select></label>
     </div>
+    <label>Pace<select name="pace">${opt('best', 'Best results: longer rest on big lifts', p.pace || 'best')}${opt('quick', 'Time-efficient: shorter rest, more supersets', p.pace)}</select></label>
     <label>Experience<select name="level">${['beginner', 'intermediate', 'expert'].map(l => opt(l, cap(l), p.level)).join('')}</select></label>
     <fieldset><legend>Equipment you have</legend><div class="checks">${EQUIPMENT.map(e =>
       `<label><input type="checkbox" name="equipment" value="${e}"${p.equipment.includes(e) ? ' checked' : ''}>${cap(e)}</label>`).join('')}</div></fieldset>
@@ -108,7 +109,7 @@ export function openPlanBuilder(done) {
   body.querySelector('form').onsubmit = async ev => {
     ev.preventDefault();
     const f = new FormData(ev.target), btn = ev.target.querySelector('[type=submit]');
-    db.profile = { goal: f.get('goal'), days: +f.get('days'), minutes: +f.get('minutes'), level: f.get('level'), equipment: f.getAll('equipment'), avoid: f.get('avoid').trim() };
+    db.profile = { goal: f.get('goal'), days: +f.get('days'), minutes: +f.get('minutes'), level: f.get('level'), pace: f.get('pace'), equipment: f.getAll('equipment'), avoid: f.get('avoid').trim() };
     save('profile');
     const list = candidates(all, db.profile);
     if (list.length < 15) return void ($('#planMsg').textContent = 'Tick more equipment: there aren\'t enough exercises to build a week from.');
@@ -132,6 +133,7 @@ export function openRoutineBuilder(done) {
       <label>Goal<select name="goal">${Object.entries(GOALS).map(([k, g]) => opt(k, g.label, p.goal)).join('')}</select></label>
       <label>Minutes<select name="minutes">${[20, 30, 45, 60, 75, 90].map(m => opt(m, m, Math.min(p.minutes, 90))).join('')}</select></label>
     </div>
+    <label>Pace<select name="pace">${opt('best', 'Best results: longer rest on big lifts', p.pace || 'best')}${opt('quick', 'Time-efficient: shorter rest, more supersets', p.pace)}</select></label>
     <p class="muted">Uses your equipment and experience from your plan answers (${esc(p.level)}, ${p.equipment.length} kinds of equipment).</p>
     <button class="pill wide" type="submit">Build Routine</button>
     <p class="muted" id="routineMsg" role="status"></p>
@@ -140,7 +142,7 @@ export function openRoutineBuilder(done) {
     ev.preventDefault();
     const f = new FormData(ev.target), btn = ev.target.querySelector('[type=submit]'), groups = f.getAll('groups');
     if (!groups.length) return void ($('#routineMsg').textContent = 'Tick at least one muscle group.');
-    const prof = { ...p, goal: f.get('goal') }, list = candidates(all, prof, groups);
+    const prof = { ...p, goal: f.get('goal'), pace: f.get('pace') }, list = candidates(all, prof, groups);
     if (list.length < 3) return void ($('#routineMsg').textContent = 'Not enough exercises for those muscles with your equipment. Tick more groups or more equipment in Build a Month Plan.');
     btn.disabled = true; btn.textContent = 'Building…';
     $('#routineMsg').textContent = '';
@@ -158,7 +160,7 @@ function previewRoutine(d, plan, goal, done) {
     ${ai.via === 'Gemini' ? '<p class="muted">Built by Gemini: your main AI service couldn\'t be reached.</p>' : ''}
     ${plan.dropped ? `<p class="muted">Left out ${plan.dropped} exercise${plan.dropped === 1 ? '' : 's'} the AI made up.</p>` : ''}
     <ol class="group setlist">${d.items.map((it, i) =>
-      `<li><span>${esc(name(it.exId))}${it.ss || d.items[i - 1]?.ss ? ' <small class="pr">superset</small>' : ''}</span><span>${it.sets} × ${it.timed ? `${it.repMin}s` : `${g.repMin}–${g.repMax}`} · <small class="muted">rest ${clock((it.rest ?? g.rest) * 1000)}</small></span></li>`).join('')}</ol>
+      `<li><span>${esc(name(it.exId))}${it.ss || d.items[i - 1]?.ss ? ' <small class="pr">superset</small>' : ''}</span><span>${it.sets} × ${it.timed ? `${it.repMin}s` : `${g.repMin}–${g.repMax}`} · <small class="muted">rest ${clock((it.rest ?? g.rest) * 1000)}</small></span>${it.why ? `<small class="why">${esc(it.why)}</small>` : ''}</li>`).join('')}</ol>
     <div class="group menu-list gap">
       <button data-m="save">Save as Routine</button>
       <button data-m="again">Change Focus</button>
@@ -168,7 +170,7 @@ function previewRoutine(d, plan, goal, done) {
     if (m === 'again') return openRoutineBuilder(done);
     if (m !== 'save') return;
     db.routines.push({ id: uid(), name: d.name, aiOne: true,
-      items: d.items.map(it => ({ ...it, repMin: it.timed ? it.repMin : g.repMin, repMax: it.timed ? it.repMax : g.repMax, rest: it.rest ?? g.rest })) });
+      items: d.items.map(({ why, ...it }) => ({ ...it, repMin: it.timed ? it.repMin : g.repMin, repMax: it.timed ? it.repMax : g.repMax, rest: it.rest ?? g.rest })) });
     save('routines');
     closeSheet();
     done();
@@ -205,7 +207,7 @@ function preview(plan, done, wk = 0) {
     ${plan.via ? `<p class="muted">Built by ${plan.via}: your main AI service couldn't be reached.</p>` : ''}
     ${plan.dropped ? `<p class="muted">Left out ${plan.dropped} exercise${plan.dropped === 1 ? '' : 's'} the AI made up.</p>` : ''}
     ${days.map(d => `<h3>${esc(d.name)}</h3><ol class="group setlist">${d.items.map((it, i) =>
-      `<li><span>${esc(name(it.exId))}${it.ss || d.items[i - 1]?.ss ? ' <small class="pr">superset</small>' : ''}</span><span>${it.sets} × ${it.timed ? `${it.repMin}s` : `${g.repMin}–${g.repMax}`} · <small class="muted">rest ${clock((it.rest ?? g.rest) * 1000)}</small></span></li>`).join('')}</ol>`).join('')}
+      `<li><span>${esc(name(it.exId))}${it.ss || d.items[i - 1]?.ss ? ' <small class="pr">superset</small>' : ''}</span><span>${it.sets} × ${it.timed ? `${it.repMin}s` : `${g.repMin}–${g.repMax}`} · <small class="muted">rest ${clock((it.rest ?? g.rest) * 1000)}</small></span>${it.why ? `<small class="why">${esc(it.why)}</small>` : ''}</li>`).join('')}</ol>`).join('')}
     <div class="group menu-list gap">
       <button data-m="save">Start This Month</button>
       <button data-m="again">Change Answers</button>
@@ -219,7 +221,7 @@ function preview(plan, done, wk = 0) {
     if (m !== 'save') return;
     startMonth(plan.weeks.map(w => w.map(d => ({
       name: d.name,
-      items: d.items.map(it => ({ ...it, repMin: it.timed ? it.repMin : g.repMin, repMax: it.timed ? it.repMax : g.repMax, rest: it.rest ?? g.rest })),
+      items: d.items.map(({ why, ...it }) => ({ ...it, repMin: it.timed ? it.repMin : g.repMin, repMax: it.timed ? it.repMax : g.repMax, rest: it.rest ?? g.rest })),
     }))), plan.notes);
     closeSheet();
     done();
