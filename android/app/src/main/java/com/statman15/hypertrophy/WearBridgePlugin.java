@@ -1,5 +1,6 @@
 package com.statman15.hypertrophy;
 
+import android.content.Intent;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -60,6 +61,23 @@ public class WearBridgePlugin extends Plugin {
             PutDataRequest put = req.asPutDataRequest().setUrgent();
             DataClient data = Wearable.getDataClient(getContext());
             data.putDataItem(put).addOnFailureListener(e -> { });
+        } catch (Throwable ignored) {
+        }
+        call.resolve();
+    }
+
+    // Starts/updates the keep-alive foreground service while a workout is active, stops it otherwise.
+    @PluginMethod
+    public void setWorkout(PluginCall call) {
+        try {
+            Intent i = new Intent(getContext(), WorkoutKeepAlive.class);
+            if (Boolean.TRUE.equals(call.getBoolean("active", false))) {
+                i.putExtra("title", call.getString("title", "Workout"));
+                i.putExtra("text", call.getString("text", ""));
+                getContext().startForegroundService(i); // throws from the background on Android 12+; retried on the next foreground push
+            } else {
+                getContext().stopService(i);
+            }
         } catch (Throwable ignored) {
         }
         call.resolve();

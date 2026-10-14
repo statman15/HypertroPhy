@@ -70,7 +70,15 @@ export function render() {
 }
 
 // --- For the watch (watch.js): what a set shows, and the actions the watch can send.
-export const watchCtx = { name, timed: it => timed(it), setTarget };
+export const watchCtx = { name, timed: it => timed(it), setTarget, setVals, wStep };
+// Set list for the watch: logged values if done, else what ticking it now would log (r falls back to the range default).
+function setVals(it, j) {
+  const s = it.sets[j];
+  if (s.done) return { w: +s.w || 0, r: +s.r || 0 };
+  const t = setTarget(it, j);
+  return { w: t.w, r: t.r > 0 ? t.r : firstR(it) };
+}
+const wStep = it => lib[it.exId]?.equipment === 'barbell' && kit().have.length ? 2 * Math.min(...kit().have) : db.settings.units === 'kg' ? 2.5 : 5;
 // Weight and reps (or seconds) for set j: what's typed, else the same placeholder the logger shows.
 function setTarget(it, j) {
   const s = it.sets[j], p = s.wu ? null : hint(it, workIdx(it, j));
@@ -84,9 +92,14 @@ export function watchStart(id) {
   start(r);
   changed();
 }
-export function watchSetDone(i, j) {
-  const a = db.active;
+export function watchSetDone(i, j, w, r) {
+  const a = db.active, s = a?.items[i]?.sets[j];
   if (!a) return;
+  if (s && w !== undefined) { // explicit values from the watch: write them, then log with the normal check (a done set stays done)
+    Object.assign(s, { w, r });
+    if (!s.done && !check(i, j)) return;
+    return changed();
+  }
   if (a.hold) return completeHold(Math.max(1, Math.round((Date.now() - a.hold.start) / 1000)));
   if (timed(a.items[i])) startHold(i, j);
   else if (!check(i, j)) return;

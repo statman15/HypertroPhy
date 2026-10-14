@@ -23,8 +23,24 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- The watch opens the app with hypertrophy://open when the phone app isn't running. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="hypertrophy" android:host="open" />
+            </intent-filter>
 
         </activity>
+
+        <service
+            android:name=".WorkoutKeepAlive"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps an active workout and the Galaxy Watch link running while the phone is locked" />
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -43,6 +59,8 @@
     <!-- Rest timer: exact alarms, auto-granted on Android 13+, so the plugin never sends you to a settings screen mid-workout. -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <!-- In-app updater: opens the downloaded APK in the system installer. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Health Connect: weight is the only thing read (never written). The plugin declares every health type; these lines strip the rest. -->

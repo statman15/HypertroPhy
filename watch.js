@@ -3,19 +3,30 @@
 import { db, save } from './store.js';
 import { num } from './ui.js';
 
-// The state JSON the watch shows. Pure: ctx = { name(exId), timed(item), setTarget(item, j) -> {w, r} } comes from workout.js.
+// The state JSON the watch shows. Pure: ctx = { name(exId), timed(item), setTarget(item, j) -> {w, r}, setVals(item, j) -> {w, r} for the set list, wStep(item) } comes from workout.js.
 export function watchState(active, routines, units, ctx) {
   if (!active) return { v: 1, active: false, units, routines: routines.map(r => ({ id: r.id, name: String(r.name) })) };
   const all = active.items.flatMap((it, i) => it.sets.map((s, j) => ({ it, i, j, s })));
   const cur = all.find(x => !x.s.done);
+  const items = active.items.map(it => {
+    const T = !!ctx.timed(it);
+    return { name: ctx.name(it.exId), timed: T, wStep: ctx.wStep(it), rStep: T ? 5 : 1,
+      sets: it.sets.map((s, j) => ({ label: s.wu ? `W${it.sets.slice(0, j + 1).filter(x => x.wu).length}` : String(it.sets.slice(0, j + 1).filter(x => !x.wu).length), ...ctx.setVals(it, j), done: !!s.done })) };
+  });
   const base = { v: 1, active: true, units, name: String(active.name), started: active.start, restEnd: active.restEnd || 0, holdEnd: active.hold?.end || 0,
-    done: all.filter(x => x.s.done).length, total: all.length };
+    done: all.filter(x => x.s.done).length, total: all.length, items, cur: cur ? { i: cur.i, j: cur.j } : null };
   if (!cur) return { ...base, exercise: '', set: 'All sets done', target: '', timed: false, next: null };
   const { it, i, j, s } = cur, T = !!ctx.timed(it), wu = !!s.wu, of = it.sets.filter(x => !!x.wu === wu);
   const { w, r } = ctx.setTarget(it, j), k = it.sets.slice(0, j).filter(x => !!x.wu === wu).length + 1;
   const next = active.items.slice(i + 1).find(x => x.sets.some(y => !y.done));
   return { ...base, exercise: ctx.name(it.exId), timed: T, set: `${wu ? 'Warm-up' : 'Set'} ${k} of ${of.length}`,
     target: T ? `${r} s hold` : w > 0 ? `${num(w)} ${units} × ${r}` : `${r} reps`, next: next ? ctx.name(next.exId) : null };
+}
+
+// Keep-alive notification (title, text) from the same state; active=false stops the phone's foreground service.
+export function keepAlive(st) {
+  if (!st.active) return { active: false };
+  return { active: true, title: st.name, text: st.exercise ? `${st.exercise} · ${st.set} · ${st.target}` : st.set };
 }
 
 // Wiring: wk is the workout.js module (passed in so this file stays importable from Node tests).
@@ -25,7 +36,13 @@ export function init(wk) {
   let timer, lastHr = 0;
   const push = () => {
     clearTimeout(timer);
-    timer = setTimeout(() => { try { plugin.pushState({ json: JSON.stringify(watchState(db.active, db.routines, db.settings.units, wk.watchCtx)) }).catch(() => {}); } catch {} }, 300);
+    timer = setTimeout(() => {
+      try {
+        const st = watchState(db.active, db.routines, db.settings.units, wk.watchCtx);
+        plugin.pushState({ json: JSON.stringify(st) }).catch(() => {});
+        plugin.setWorkout(keepAlive(st)).catch(() => {});
+      } catch {}
+    }, 300);
   };
   wk.hooks.change = push;
   plugin.addListener('hello', push);
@@ -46,6 +63,10 @@ export function action(wk, a) {
   if (a?.type === 'start') wk.watchStart(String(a.routineId));
   else if (!act) return;
   else if (a.type === 'setDone') {
+    // With i, j, w, r: write those values into that set (clamped) and check it off; without, the current set.
+    const [i, j, w, r] = [a.i, a.j, a.w, a.r].map(Number);
+    if ([a.i, a.j, a.w, a.r].every(v => v != null && v !== '') && [i, j, w, r].every(Number.isFinite) && act.items[i]?.sets[j])
+      return wk.watchSetDone(i, j, Math.max(0, Math.min(2000, w)), Math.max(1, Math.min(3600, Math.round(r))));
     const cur = act.items.flatMap((it, i) => it.sets.map((s, j) => ({ i, j, s }))).find(x => !x.s.done);
     if (cur || act.hold) wk.watchSetDone(cur?.i, cur?.j);
   } else if (a.type === 'skipRest') wk.watchRest(0);
