@@ -31,7 +31,15 @@ try {
   await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
   page.setDefaultTimeout(5000);
   await page.setRequestInterception(true);
-  page.on('request', r => /cdn\.jsdelivr\.net|api\.github\.com/.test(r.url()) ? r.abort() : r.continue());
+  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
+  const fakeReply = 'Swap it for a hack squat.\n```changes\n[{"op":"swap","routine":"smoke1","from":"Barbell_Squat","to":"Barbell_Hack_Squat"},{"op":"swap","routine":"smoke1","from":"Made_Up","to":"Barbell_Hack_Squat"}]\n```';
+  page.on('request', r => {
+    if (/cdn\.jsdelivr\.net|api\.github\.com/.test(r.url())) return r.abort();
+    if (r.url().startsWith('https://fake.test/')) // the fake AI service: canned chat reply, nothing leaves the machine
+      return r.method() === 'OPTIONS' ? r.respond({ status: 204, headers: cors })
+        : r.respond({ status: 200, headers: cors, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: fakeReply } }] }) });
+    r.continue();
+  });
   page.on('pageerror', e => errors.push(`pageerror: ${e.message}`));
   page.on('console', m => m.type() === 'error' && !/Failed to load resource/.test(m.text()) && errors.push(`console.error: ${m.text()}`));
   page.on('requestfailed', r => r.url().startsWith(origin) && errors.push(`failed request: ${r.url()}`));
@@ -94,6 +102,30 @@ try {
     await click('[data-act=discard]');
     await text('#workout', 'Start Empty Workout');
   });
+
+  await run('coach edits', async () => {
+    const routine = () => page.evaluate(() => JSON.parse(localStorage.routines)[0].items[0].exId);
+    await page.evaluate(() => localStorage.setItem('routines', JSON.stringify([{ id: 'smoke1', name: 'Smoke Day', items: [{ exId: 'Barbell_Squat', sets: 3, repMin: 8, repMax: 12, rest: 90, ss: false }] }])));
+    await page.reload();
+    await text('#workout', 'Start Empty Workout');
+    await click('[data-go=settings]');
+    await click('[data-preset=other]');
+    await page.type('[data-ai=url]', 'https://fake.test/v1');
+    await page.type('[data-ai=key]', 'k');
+    await page.type('[data-ai=model]', 'm');
+    await click('[data-go=coach]');
+    await page.type('#coach textarea[name=q]', 'Swap my squat');
+    await page.keyboard.press('Enter');
+    await text('#coach', 'Skipped:');
+    const n = await page.$$eval('#coach .chg', l => l.length);
+    if (n !== 1) throw new Error(`${n} change cards, wanted 1`);
+    await click('[data-do=apply]');
+    await text('#coach', 'Applied');
+    if (await routine() !== 'Barbell_Hack_Squat') throw new Error('Apply did not change the routine');
+    await click('[data-do=undo]');
+    await page.waitForSelector('[data-do=apply]');
+    if (await routine() !== 'Barbell_Squat') throw new Error('Undo did not revert the routine');
+  });
 } catch (e) {
   errors.push(`step "${step}" failed: ${e.message}`);
 } finally {
@@ -102,4 +134,4 @@ try {
 }
 
 if (errors.length) { console.error(`FAIL (${errors.length}):\n  ${[...new Set(errors)].join('\n  ')}`); process.exit(1); }
-console.log('PASS smoke: app loads, 5 tabs render, exercise sheet, workout logger + rest bar, watch state, no console errors');
+console.log('PASS smoke: app loads, 5 tabs render, exercise sheet, workout logger + rest bar, watch state, coach edit cards (apply + undo), no console errors');

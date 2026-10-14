@@ -8,6 +8,7 @@ import * as ai from './ai.js';
 const { chat, candidates, planPrompt, routinePrompt, parsePlan, EQUIPMENT, MUSCLE_GROUPS } = ai;
 import { cap, isTimed } from './exercises.js';
 import { openScience } from './science.js';
+import { editContext, EDIT_RULES, parseChanges, applyChange, undoChange, reachesPlan } from './coachEdits.js';
 
 const SRC_LINE = '<p class="muted">Built from research-based training guidelines · <button class="text-btn" data-science>See the sources</button></p>';
 
@@ -24,6 +25,8 @@ export function init(list, byId) {
     if (ev.target.name === 'q' && ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); send(ev.target.value); }
   });
   root.addEventListener('click', ev => {
+    const c = ev.target.closest('[data-do]');
+    if (c) return decide(+c.dataset.m, +c.dataset.i, c.dataset.do);
     const b = ev.target.closest('[data-act], [data-ask]');
     if (!b) return;
     if (b.dataset.ask) return send(b.dataset.ask);
@@ -44,7 +47,7 @@ export function render() {
       <div class="suggest">${SUGGESTIONS.map(s => `<button data-ask="${esc(s)}">${esc(s)}</button>`).join('')}</div>
       <button class="pill wide" data-act="plan">${icon('sparkle')}Build a Month Plan with AI</button>
       <button class="pill wide quiet" data-act="routine">${icon('sparkle')}Build One Routine</button>`}
-    ${db.chat.map(m => `<div class="msg ${m.role}">${fmt(m.content)}</div>${m.via ? `<small class="via">Answered by ${m.via}: your main AI service couldn't be reached</small>` : ''}`).join('')}
+    ${db.chat.map((m, k) => `<div class="msg ${m.role}">${fmt(m.content)}</div>${m.via ? `<small class="via">Answered by ${esc(m.via)}: your main AI service couldn't be reached</small>` : ''}${cards(m, k)}`).join('')}
     ${busy ? '<div class="msg assistant typing" aria-label="Coach is typing"><i></i><i></i><i></i></div>' : ''}
     ${error ? `<div class="msg error" role="alert">${esc(error)}</div>` : ''}
   </div>
@@ -53,6 +56,39 @@ export function render() {
     <button class="send" aria-label="Send"${busy ? ' disabled' : ''}>${icon('send')}</button>
   </form>`;
   root.querySelector('.chat').lastElementChild?.scrollIntoView({ block: 'end' });
+}
+
+// One card per suggested change under the coach's reply. Everything shown is escaped; buttons carry only indexes.
+function cards(m, k) {
+  if (!m.changes?.length) return '';
+  const newest = Math.max(0, ...db.chat.flatMap(x => x.changes || []).filter(c => c.status === 'applied').map(c => c.at || 0)); // only the newest applied change can be undone
+  return `<div class="chgs">${m.changes.map((c, i) => {
+    if (c.invalid) return `<small class="muted skip">Skipped: ${esc(c.reason)}</small>`;
+    const r = db.routines.find(r => r.id === c.routine);
+    const note = c.status === 'applied' ? (db.active ? 'Applies from your next workout.' : '') : '';
+    const scope = reachesPlan(r, db) ? 'This week and the rest of the month' : '';
+    const btn = (d, t, cls = 'text-btn') => `<button class="${cls}" data-do="${d}" data-m="${k}" data-i="${i}">${t}</button>`;
+    return `<div class="chg group"><div class="chg-text">${esc(c.desc)}</div>
+      ${scope || note ? `<small class="muted">${esc([scope, note].filter(Boolean).join(' · '))}</small>` : ''}
+      <div class="chg-act">${{
+        applied: `<span class="applied">Applied</span>${(c.at || 0) === newest ? btn('undo', 'Undo') : ''}`,
+        dismissed: '<span class="muted">Dismissed</span>',
+        stale: '<span class="muted">No longer fits your routine</span>',
+      }[c.status] || `${btn('apply', 'Apply', 'pill')}${btn('dismiss', 'Dismiss')}`}</div></div>`;
+  }).join('')}</div>`;
+}
+
+function decide(k, i, what) {
+  const c = db.chat[k]?.changes?.[i];
+  if (!c || c.invalid) return;
+  if (what === 'apply' && c.status === 'pending') {
+    const snap = applyChange(c, db, lib);
+    Object.assign(c, snap ? { status: 'applied', undo: snap, at: Date.now() } : { status: 'stale' });
+  } else if (what === 'dismiss' && c.status === 'pending') c.status = 'dismissed';
+  else if (what === 'undo' && c.status === 'applied') { undoChange(c.undo, db); c.status = 'pending'; delete c.undo; }
+  else return;
+  save('chat');
+  render();
 }
 
 async function send(q) {
@@ -64,8 +100,10 @@ async function send(q) {
   busy = true; error = '';
   render();
   try {
-    const content = await chat([{ role: 'system', content: context() }, ...db.chat.slice(-20).map(({ role, content }) => ({ role, content }))]);
-    db.chat.push({ role: 'assistant', content, ...(ai.via === 'Gemini' && { via: 'Gemini' }) });
+    const ec = editContext(db.routines, lib, db.profile, all);
+    const reply = await chat([{ role: 'system', content: context(ec) }, ...db.chat.slice(-20).map(({ role, content }) => ({ role, content }))]);
+    const { text, changes } = parseChanges(reply, ec);
+    db.chat.push({ role: 'assistant', content: text || reply, ...(changes.length && { changes: changes.map(c => c.invalid ? c : { ...c, status: 'pending' }) }), ...(ai.via === 'Gemini' && { via: 'Gemini' }) });
     save('chat');
   } catch (e) { error = e.message; }
   busy = false;
@@ -73,7 +111,7 @@ async function send(q) {
 }
 
 // What the coach knows: profile, routines, the app's progression rule, and 4 weeks of sets.
-function context() {
+function context(ec) {
   const u = db.settings.units, p = db.profile, g = p && GOALS[p.goal];
   const recent = db.workouts.filter(w => w.start > Date.now() - 28 * 864e5);
   return [
@@ -83,7 +121,8 @@ function context() {
     db.body.weights.length > 1 ? `Recent body weight (${db.settings.units}), oldest first: ${db.body.weights.slice(-8).map(x => `${day(x.t)} ${num(x.w)}`).join(', ')}.` : '',
     db.plan ? (monthDone() ? 'Their month plan has finished; they have not built the next one yet.' : `They are in week ${weekIndex() + 1} of a 4-week plan${db.plan.deload === weekIndex() ? ' (the deload week)' : ''}.`) : '',
     p ? `Profile: goal ${g.label} (${g.repMin}-${g.repMax} reps), ${p.days} days a week, ${p.minutes} min sessions, ${p.level}, equipment: ${p.equipment.join(', ')}${p.avoid ? `; avoid: ${p.avoid}` : ''}.` : 'No profile set yet.',
-    'Routines:', ...(db.routines.length ? db.routines.map(r => `- ${r.name}: ${r.items.map(it => `${name(it.exId)} ${it.sets}x${it.repMin}-${it.repMax}`).join(', ')}`) : ['- none']),
+    db.routines.length ? ec.text : 'They have no routines yet.',
+    db.routines.length ? EDIT_RULES : '',
     'Workouts in the last 4 weeks, newest first:',
     ...(recent.length ? recent.map(w => `- ${day(w.start)} ${w.name}: ${w.items.map(it => `${name(it.exId)} ${it.sets.map(s => it.timed ? `${+s.w ? num(s.w) + 'x' : ''}${s.r}s` : `${num(s.w)}x${s.r}`).join(' ')}`).join('; ')}`) : ['- none logged']),
   ].filter(Boolean).join('\n');

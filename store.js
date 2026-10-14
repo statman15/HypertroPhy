@@ -115,7 +115,7 @@ export function restore(data) {
     heightCm: +b.heightCm > 0 && +b.heightCm < 300 ? +b.heightCm : '',
     weights: Array.isArray(b.weights) ? b.weights.filter(x => Number.isFinite(x?.t) && +x.w > 0).map(x => ({ t: x.t, w: +x.w, ...(x.src === 'hc' && { src: 'hc' }) })) : [],
   };
-  db.chat = Array.isArray(data.chat) ? data.chat.filter(m => ['user', 'assistant'].includes(m?.role) && typeof m.content === 'string') : [];
+  db.chat = Array.isArray(data.chat) ? data.chat.filter(m => ['user', 'assistant'].includes(m?.role) && typeof m.content === 'string').map(m => ({ role: m.role, content: m.content })) : []; // no change cards: their undo data is outside input
   db.settings = { units: data.settings.units, ai: db.settings.ai, lastBackup: data.exported };
   db.active = null;
   save('settings', 'routines', 'workouts', 'profile', 'chat', 'active', 'body', 'plan', 'plans');

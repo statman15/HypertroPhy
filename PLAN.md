@@ -140,6 +140,12 @@ Decisions: Wear OS first (Chris: Galaxy Watch). The **phone is the brain**: the 
 
 **Install (per update):** on the watch, Developer options → ADB debugging + Wireless debugging; pair once with `adb pair <ip:port> <code>`, then `adb connect <ip:port>` and `adb install -r HypertroPhy-watch-<ver>.apk`.
 
+## Coach edits
+- The coach can suggest swap, sets, reps (seconds for timed), rest, add and remove on your routines (no whole-day rebuilds). `coachEdits.js`: the coach prompt lists each routine's items and up to 8 swap-in candidates per muscle (`candidates()`), and asks for a final ```changes JSON block (max 5). `parseChanges` treats that as untrusted: known ops only, routine and exercises must exist (ids or names), swap-in exercises must pass the candidates filter and not be in the routine already, numbers clamped; bad ones show as "Skipped: reason".
+- Each valid change is a card under the reply (before → after) with Apply / Dismiss; Applied shows Undo (newest applied change only). Cards and the undo snapshot live on the chat message in localStorage; `restore()` keeps only role/content, so restored chats have no cards.
+- Reach: a month-plan routine (`r.ai`) changes this week's routine and the same-named day in every remaining week of `db.plan` (weeks without the "from" exercise are skipped; `sets` skips the deload week), so Monday's `applyWeek` doesn't undo it. Own routines change alone. A workout in progress is never touched ("Applies from your next workout").
+- Tests: `coachEdits.test.js`; the smoke drives a fake AI (https://fake.test, intercepted) through Apply and Undo.
+
 ## Android build notes
 - Web files are copied into `www/` by `npm run sync` (copy-web.js + cap sync); never edit `www/` or `android/app/src/main/assets` by hand.
 - Keystore: `~/hypertrophy-keystore` (release.p12, password.txt, release.p12.b64), also in repo secrets KEYSTORE_B64 / KEYSTORE_PASSWORD. **Back the folder up to the password manager**: every future APK must be signed with it or updates won't install.
