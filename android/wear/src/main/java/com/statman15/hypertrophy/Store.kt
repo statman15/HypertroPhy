@@ -17,10 +17,11 @@ import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
 
 /** Phone state, protocol v1 (see PLAN.md "Phase 9"). */
-data class Routine(val id: String, val name: String)
+data class RItem(val name: String, val sets: Int, val reps: String, val timed: Boolean, val w: Double, val ss: Boolean)
+data class Routine(val id: String, val name: String, val items: List<RItem> = emptyList())
 
 data class SSet(val label: String, val w: Double, val r: Int, val done: Boolean)
-data class SItem(val name: String, val timed: Boolean, val wStep: Double, val rStep: Int, val sets: List<SSet>)
+data class SItem(val name: String, val timed: Boolean, val wStep: Double, val rStep: Int, val rest: Int, val ss: Boolean, val sets: List<SSet>)
 
 data class WState(
     val units: String = "lb",
@@ -47,7 +48,11 @@ fun parseState(json: String): WState? = try {
     val rs = o.optJSONArray("routines")
     WState(
         active = o.optBoolean("active"),
-        routines = (0 until (rs?.length() ?: 0)).map { rs!!.getJSONObject(it).let { r -> Routine(r.getString("id"), r.optString("name")) } },
+        routines = (0 until (rs?.length() ?: 0)).map { rs!!.getJSONObject(it).let { r ->
+            val ri = r.optJSONArray("items")
+            Routine(r.getString("id"), r.optString("name"), (0 until (ri?.length() ?: 0)).map { k -> ri!!.getJSONObject(k).let { x ->
+                RItem(x.optString("name"), x.optInt("sets"), x.optString("reps"), x.optBoolean("timed"), x.optDouble("w", 0.0), x.optBoolean("ss")) } })
+        } },
         name = o.optString("name"), started = o.optLong("started"),
         exercise = o.optString("exercise"), set = o.optString("set"), target = o.optString("target"),
         timed = o.optBoolean("timed"), restEnd = o.optLong("restEnd"), holdEnd = o.optLong("holdEnd"),
@@ -56,7 +61,7 @@ fun parseState(json: String): WState? = try {
         units = o.optString("units", "lb"),
         items = o.optJSONArray("items")?.let { a -> (0 until a.length()).map { k -> a.getJSONObject(k).let { it2 ->
             val ss = it2.getJSONArray("sets")
-            SItem(it2.optString("name"), it2.optBoolean("timed"), it2.optDouble("wStep", 5.0), it2.optInt("rStep", 1),
+            SItem(it2.optString("name"), it2.optBoolean("timed"), it2.optDouble("wStep", 5.0), it2.optInt("rStep", 1), it2.optInt("rest"), it2.optBoolean("ss"),
                 (0 until ss.length()).map { m -> ss.getJSONObject(m).let { x -> SSet(x.optString("label"), x.optDouble("w"), x.optInt("r"), x.optBoolean("done")) } })
         } } } ?: emptyList(),
         curI = o.optJSONObject("cur")?.optInt("i", -1) ?: -1, curJ = o.optJSONObject("cur")?.optInt("j", -1) ?: -1,
@@ -68,6 +73,11 @@ object Store {
     val state = MutableStateFlow<WState?>(null)
     val bpm = MutableStateFlow(0)
     val hrSupported = MutableStateFlow(true)
+
+    /** Heart-rate samples of the current workout, for the summary screen (reset when a workout starts). */
+    data class HrStats(val sum: Long = 0, val n: Int = 0, val max: Int = 0)
+    val hr = MutableStateFlow(HrStats())
+    fun addHr(bpm: Int) { hr.value = hr.value.let { HrStats(it.sum + bpm, it.n + 1, maxOf(it.max, bpm)) } }
 
     private val scope = CoroutineScope(Dispatchers.Default)
     private const val TAG = "HypertroPhy"
@@ -82,6 +92,7 @@ object Store {
     fun onItem(ctx: Context, item: DataItem) {
         val map = com.google.android.gms.wearable.DataMapItem.fromDataItem(item).dataMap
         val s = parseState(map.getString("json") ?: return) ?: return
+        if (s.active && state.value?.active != true) hr.value = HrStats()
         state.value = s
         val id = pendingStart ?: return
         if (s.active || System.currentTimeMillis() - pendingAt > 60_000) { pendingStart = null; opening.value = false }

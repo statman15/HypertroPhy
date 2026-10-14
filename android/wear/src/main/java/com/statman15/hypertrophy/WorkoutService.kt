@@ -35,6 +35,7 @@ class WorkoutService : Service() {
             val p = update.latestMetrics.getData(DataType.HEART_RATE_BPM).lastOrNull() as? SampleDataPoint<Double> ?: return
             val bpm = p.value.toInt()
             Store.bpm.value = bpm
+            Store.addHr(bpm)
             val now = System.currentTimeMillis()
             if (now - lastSent >= 5000) {
                 lastSent = now

@@ -3,6 +3,7 @@ import { $, esc, num, day, clock, icon, restOptions, sheet, closeSheet } from '.
 import { db, save, uid, lastSets, sessions, records, e1rm, volume, bodyweight } from './store.js';
 import { nextTarget, nextHold, stepFor, DEFAULT_RANGE, TIME_RANGE, GOALS, plates, warmups, PLATE_DEFAULTS } from './progression.js';
 import { startGuess } from './guess.js';
+import { restAfter } from './watch.js';
 import { isTimed } from './exercises.js';
 import { applyWeek, weekIndex, monthDone, monday } from './plan.js';
 
@@ -70,7 +71,8 @@ export function render() {
 }
 
 // --- For the watch (watch.js): what a set shows, and the actions the watch can send.
-export const watchCtx = { name, timed: it => timed(it), setTarget, setVals, wStep: it => wStep(it) }; // wStep is defined below; wrap it so this line runs first
+export const watchCtx = { name, timed: it => timed(it), setTarget, setVals, wStep: it => wStep(it),
+  range: it => range(it), first: it => { const h = hint(it, 0); return { w: +(h?.w || 0), r: +(h?.r ?? firstR(it)) }; } }; // wStep is defined below; wrap it so this line runs first
 // Set list for the watch: logged values if done, else what ticking it now would log (r falls back to the range default).
 function setVals(it, j) {
   const s = it.sets[j];
@@ -92,11 +94,12 @@ export function watchStart(id) {
   start(r);
   changed();
 }
-export function watchSetDone(i, j, w, r) {
+export function watchSetDone(i, j, w, r, hold) {
   const a = db.active, s = a?.items[i]?.sets[j];
   if (!a) return;
   if (s && w !== undefined) { // explicit values from the watch: write them, then log with the normal check (a done set stays done)
     Object.assign(s, { w, r });
+    if (hold && !s.done && timed(a.items[i])) { startHold(i, j); return changed(); }
     if (!s.done && !check(i, j)) return;
     return changed();
   }
@@ -105,10 +108,10 @@ export function watchSetDone(i, j, w, r) {
   else if (!check(i, j)) return;
   changed();
 }
-export function watchRest(seconds) { // 0 skips the rest, else adds seconds
+export function watchRest(seconds) { // 0 skips the rest, else adds seconds (negative shortens it)
   const a = db.active;
   if (!a) return;
-  a.restEnd = seconds > 0 ? Math.max(a.restEnd || 0, Date.now()) + Math.min(seconds, 600) * 1000 : 0;
+  a.restEnd = restAfter(a.restEnd, seconds, Date.now());
   changed();
 }
 export const watchFinish = () => db.active && finish(true);
