@@ -70,7 +70,7 @@ export function render() {
 }
 
 // --- For the watch (watch.js): what a set shows, and the actions the watch can send.
-export const watchCtx = { name, timed: it => timed(it), setTarget, setVals, wStep };
+export const watchCtx = { name, timed: it => timed(it), setTarget, setVals, wStep: it => wStep(it) }; // wStep is defined below; wrap it so this line runs first
 // Set list for the watch: logged values if done, else what ticking it now would log (r falls back to the range default).
 function setVals(it, j) {
   const s = it.sets[j];
