@@ -7,7 +7,7 @@ Lifting log for Chris (Android app) and his wife (iPhone, web app). Read PLAN.md
 - The web app (GitHub Pages, https://statman15.github.io/HypertroPhy/) and the Android app (Capacitor APK on GitHub Releases) run the **same web files** at the repo root. A push to `main` deploys Pages and builds a signed APK release.
 - Never build a feature only into `android/`. Native-only behaviour (Capacitor plugins, plain-http LAN access, the update banner) needs a web equivalent, or tell Chris what the iPhone can't do.
 - After pushing, confirm both: the Pages build finished and serves the new code, and the Android APK workflow published a release.
-- **Before every push, load the app in the browser pane** (local server on :5173) **and check the console for errors.** `npm test` only covers pure logic; it never loads app.js, workout.js, history.js or coach.js. In v1.0.14 a use-before-definition at module load (`wStep`) blanked the whole app on both phones and the update banner couldn't run, so the fix had to be installed by hand.
+- **CI now gates every push automatically** (`npm run smoke` loads the app in headless Chrome and fails on any console/page error, blocking both the APK and the Pages deploy), but still **before every push, load the app in the browser pane** (local server on :5173) **and check the console for errors.** `npm test` only covers pure logic; it never loads app.js, workout.js, history.js or coach.js. In v1.0.14 a use-before-definition at module load (`wStep`) blanked the whole app on both phones and the update banner couldn't run, so the fix had to be installed by hand.
 
 ## Delegate to cheaper models
 
