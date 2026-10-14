@@ -59,6 +59,15 @@ try {
     await page.evaluate(() => document.querySelector('#sheet').close());
   });
 
+  await run('science sheet', async () => {
+    await click('[data-go=settings]');
+    await click('[data-science]');
+    await text('#sheetBody', 'The science behind your AI workouts');
+    const n = await page.$$eval('#sheetBody .sources li', l => l.length);
+    if (n < 10) throw new Error(`only ${n} sources`);
+    await page.evaluate(() => document.querySelector('#sheet').close());
+  });
+
   await run('workout logger', async () => {
     await click('[data-go=workout]');
     await click('[data-act=empty]');

@@ -7,6 +7,7 @@ import * as history from './history.js';
 import * as coach from './coach.js';
 import * as ai from './ai.js';
 import * as watch from './watch.js';
+import { openScience } from './science.js';
 const { PRESETS, conn, models, chat } = ai;
 
 const img = (path, alt = '') => path ? `<img src="${photo(path)}" crossorigin="anonymous" loading="lazy" alt="${alt}">` : '';
@@ -147,6 +148,9 @@ ${PRESETS[ai.preset].home ? `<label>Home address<input data-ai="home" value="${e
     <button class="pill wide" data-test>Test Connection</button>
     <p class="muted" id="aiMsg" role="status">The key is stored only on this phone.</p>
 
+    <h3 class="label">Why trust the AI</h3>
+    <div class="group menu-list"><button data-science>The science behind your AI workouts</button></div>
+
     <h3 class="label">Backup</h3>
     <div class="group menu-list">
       <button data-backup>Save Backup</button>
@@ -156,8 +160,9 @@ ${PRESETS[ai.preset].home ? `<label>Home address<input data-ai="home" value="${e
   </div>`;
 }
 $('#settings').addEventListener('click', async ev => {
-  const b = ev.target.closest('[data-units], [data-preset], [data-test], [data-sex]');
+  const b = ev.target.closest('[data-units], [data-preset], [data-test], [data-sex], [data-science]');
   if (!b) return;
+  if (b.dataset.science != null) return openScience();
   if (b.dataset.units) { setUnits(b.dataset.units); return renderSettings(); }
   if (b.dataset.sex != null) { db.body.sex = b.dataset.sex; save('body'); return renderSettings(); }
   if (b.dataset.preset) { db.settings.ai.preset = b.dataset.preset; save('settings'); return renderSettings(); }
@@ -212,6 +217,15 @@ history.init(byId);
 watch.init(workout);
 coach.init(all, byId);
 go('workout');
+
+// Android back button: step back through the app instead of closing it. Sheet → exercise picker or other tab → routine
+// editor → background (minimised, so a workout in progress is untouched). Registering a listener turns off the default exit.
+window.Capacitor?.Plugins?.App?.addListener?.('backButton', () => {
+  if ($('#sheet').open) return $('#sheet').close();
+  if (pickCb || $('#workout').hidden) return go('workout');
+  if (workout.back()) return;
+  window.Capacitor.Plugins.App.minimizeApp();
+});
 
 // --- Backup: the share sheet (Drive, Files, email…) where the phone has one, else a download.
 // The Android app's WebView can't share files, so it writes the file and shares it natively.

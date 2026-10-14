@@ -63,6 +63,14 @@ export function init(byId, picker, finished, showInfo, planBuilder, routineBuild
 // watch.js sets change(): every render follows a change to the workout or the routines, so the watch hears about it.
 export const hooks = { change() {} };
 
+// Android back button: leave the routine editor without saving. Returns false when there was nothing to back out of.
+export function back() {
+  if (!editing) return false;
+  editing = null;
+  render();
+  return true;
+}
+
 export function render() {
   if (!db.active && !editing) applyWeek(); // a new Monday swaps in that week's AI routines
   root().innerHTML = editing ? editorHtml() : db.active ? activeHtml() : idleHtml();

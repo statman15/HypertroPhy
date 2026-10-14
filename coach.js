@@ -7,6 +7,9 @@ import { clock } from './ui.js';
 import * as ai from './ai.js';
 const { chat, candidates, planPrompt, routinePrompt, parsePlan, EQUIPMENT, MUSCLE_GROUPS } = ai;
 import { cap, isTimed } from './exercises.js';
+import { openScience } from './science.js';
+
+const SRC_LINE = '<p class="muted">Built from research-based training guidelines · <button class="text-btn" data-science>See the sources</button></p>';
 
 let all, lib, busy = false, error = '';
 const name = id => lib[id]?.name || id;
@@ -162,6 +165,7 @@ function previewRoutine(d, plan, goal, done) {
   const g = GOALS[goal];
   const body = sheet(`<h2 id="sheetTitle">${esc(d.name)}</h2>
     <p class="muted">${esc(plan.notes)}</p>
+    ${SRC_LINE}
     ${ai.via === 'Gemini' ? '<p class="muted">Built by Gemini: your main AI service couldn\'t be reached.</p>' : ''}
     ${plan.dropped ? `<p class="muted">Left out ${plan.dropped} exercise${plan.dropped === 1 ? '' : 's'} the AI made up.</p>` : ''}
     <ol class="group setlist">${d.items.map((it, i) =>
@@ -171,6 +175,7 @@ function previewRoutine(d, plan, goal, done) {
       <button data-m="again">Change Focus</button>
     </div>`);
   body.onclick = ev => {
+    if (ev.target.closest('[data-science]')) return openScience(() => previewRoutine(d, plan, goal, done));
     const m = ev.target.closest('[data-m]')?.dataset.m;
     if (m === 'again') return openRoutineBuilder(done);
     if (m !== 'save') return;
@@ -209,6 +214,7 @@ function preview(plan, done, wk = 0) {
     <div class="seg" role="radiogroup" aria-label="Week">${plan.weeks.map((_, k) => `<button role="radio" data-wk="${k}" aria-checked="${k === wk}">Week ${k + 1}</button>`).join('')}</div>
     ${wk === 3 ? '<p class="muted">Deload week: fewer sets, and suggested weights about 10% lighter.</p>' : ''}
     <p class="muted">${esc(plan.notes)}</p>
+    ${SRC_LINE}
     ${plan.via ? `<p class="muted">Built by ${plan.via}: your main AI service couldn't be reached.</p>` : ''}
     ${plan.dropped ? `<p class="muted">Left out ${plan.dropped} exercise${plan.dropped === 1 ? '' : 's'} the AI made up.</p>` : ''}
     ${days.map(d => `<h3>${esc(d.name)}</h3><ol class="group setlist">${d.items.map((it, i) =>
@@ -219,8 +225,9 @@ function preview(plan, done, wk = 0) {
     </div>
     <p class="muted">Your AI routines switch to each week's set every Monday. Routines you made yourself stay. ${db.plan ? 'Your current month is kept in your history.' : ''}</p>`);
   body.onclick = ev => {
-    const wk = ev.target.closest('[data-wk]');
-    if (wk) return preview(plan, done, +wk.dataset.wk);
+    const tab = ev.target.closest('[data-wk]');
+    if (tab) return preview(plan, done, +tab.dataset.wk);
+    if (ev.target.closest('[data-science]')) return openScience(() => preview(plan, done, wk));
     const m = ev.target.closest('[data-m]')?.dataset.m;
     if (m === 'again') return openPlanBuilder(done);
     if (m !== 'save') return;

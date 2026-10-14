@@ -106,6 +106,7 @@ android/              Capacitor project (generated)
 
 ## Evidence-based AI prompts (2026-10-12) ✅
 - Both prompts share `guide()` in ai.js. Its rules for weekly sets per muscle, frequency, splits, exercise order and selection, rest, effort and per-goal notes come from the 2026 ACSM position stand and recent meta-analyses; sources and evidence strength are in `EVIDENCE.md`.
+- In-app sources page (`science.js`, Settings > Why trust the AI, and "See the sources" in the plan/routine previews): plain-language rules with evidence pills and linked citations. Keep it in sync with `EVIDENCE.md` when rules change.
 - **Pace** (in both builders, saved in the profile): Best results (heavy compounds 2–3 min rest) or Time-efficient (shorter rest, opposing-muscle supersets). The long rests on big lifts are intentional under Best results.
 - Each exercise comes back with a short **why**, shown in the previews only (not saved into routines).
 - Month plans keep the main lifts all month and rotate accessories every week or two.
