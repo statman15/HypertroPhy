@@ -1,7 +1,8 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp"
-    android:viewportWidth="108" android:viewportHeight="108">
-    <!-- white dumbbell, centred in the adaptive-icon safe zone -->
-    <path android:fillColor="#FFFFFF"
-        android:pathData="M30,40h6v28h-6zM36,34h6v40h-6zM42,51h24v6h-24zM66,34h6v40h-6zM72,40h6v28h-6z" />
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The logo: a weight plate on a bar that also reads as the Greek letter phi ("Phy"). Master: icon.svg at the repo root. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <group android:translateX="21.5" android:translateY="21.5" android:scaleX="0.2539" android:scaleY="0.2539">
+        <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd" android:pathData="M22,128a106,106 0 1,0 212,0a106,106 0 1,0 -212,0ZM78,128a50,50 0 1,0 100,0a50,50 0 1,0 -100,0Z"/>
+        <path android:fillColor="#FFFFFFFF" android:pathData="M118,0H138a14,14 0 0,1 14,14V242a14,14 0 0,1 -14,14H118a14,14 0 0,1 -14,-14V14a14,14 0 0,1 14,-14Z"/>
+    </group>
 </vector>

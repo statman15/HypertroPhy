@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Notification icon: the logo, white on transparent as Android requires. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="256" android:viewportHeight="256">
+        <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd" android:pathData="M22,128a106,106 0 1,0 212,0a106,106 0 1,0 -212,0ZM78,128a50,50 0 1,0 100,0a50,50 0 1,0 -100,0Z"/>
+        <path android:fillColor="#FFFFFFFF" android:pathData="M118,0H138a14,14 0 0,1 14,14V242a14,14 0 0,1 -14,14H118a14,14 0 0,1 -14,-14V14a14,14 0 0,1 14,-14Z"/>
+</vector>

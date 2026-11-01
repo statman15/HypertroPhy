@@ -23,7 +23,7 @@ public class WorkoutKeepAlive extends Service {
         nm.createNotificationChannel(new NotificationChannel("workout", "Workout in progress", NotificationManager.IMPORTANCE_LOW));
         PendingIntent open = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_IMMUTABLE);
         Notification n = new Notification.Builder(this, "workout")
-            .setSmallIcon(R.drawable.ic_stat_dumbbell)
+            .setSmallIcon(R.drawable.ic_stat_mark)
             .setContentTitle(intent != null ? intent.getStringExtra("title") : "Workout")
             .setContentText(intent != null ? intent.getStringExtra("text") : "")
             .setOngoing(true).setContentIntent(open).build();

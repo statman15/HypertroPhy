@@ -146,6 +146,10 @@ Decisions: Wear OS first (Chris: Galaxy Watch). The **phone is the brain**: the 
 - Reach: a month-plan routine (`r.ai`) changes this week's routine and the same-named day in every remaining week of `db.plan` (weeks without the "from" exercise are skipped; `sets` skips the deload week), so Monday's `applyWeek` doesn't undo it. Own routines change alone. A workout in progress is never touched ("Applies from your next workout").
 - Tests: `coachEdits.test.js`; the smoke drives a fake AI (https://fake.test, intercepted) through Apply and Undo.
 
+## Logo
+
+A weight plate on a bar that also reads as the Greek letter phi, for the "Phy" in the name; white on the app's orange. Master: `icon.svg`. The web PNGs, launcher, notification and watch icons are all drawn from its two shapes, so a logo change touches `icon-*.png`, `apple-touch-icon.png`, the Android `mipmap-*` PNGs, `ic_launcher_mark.xml`, `ic_stat_mark.xml` and the watch's `ic_launcher_fg.xml`.
+
 ## Android build notes
 - Web files are copied into `www/` by `npm run sync` (copy-web.js + cap sync); never edit `www/` or `android/app/src/main/assets` by hand.
 - Keystore: `~/hypertrophy-keystore` (release.p12, password.txt, release.p12.b64), also in repo secrets KEYSTORE_B64 / KEYSTORE_PASSWORD. **Back the folder up to the password manager**: every future APK must be signed with it or updates won't install.
