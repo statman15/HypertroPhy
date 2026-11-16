@@ -14,7 +14,9 @@ export const db = {
   plan: read('plan', null),  // the current month: { start, weeks: [[{ name, items }]], notes, deload, applied } (plan.js)
   plans: read('plans', []),  // earlier months, newest first, kept for the next month's prompt
 };
-export const save = (...keys) => { for (const k of keys) localStorage.setItem(k, JSON.stringify(db[k])); };
+// onSave: listeners called with the saved keys (lifelog.js sends workouts after they change).
+export const onSave = [];
+export const save = (...keys) => { for (const k of keys) localStorage.setItem(k, JSON.stringify(db[k])); for (const f of onSave) f(keys); };
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 // Epley estimated one-rep max.
@@ -77,10 +79,11 @@ export function aboutYou() {
   return parts.join(', ');
 }
 
-// --- Backup. AI keys never go in the file: they stay on each phone, and restoring keeps this phone's AI setup.
+// --- Backup. AI keys and the LifeLog token never go in the file: they stay on each phone, and restoring keeps this phone's setup.
 export function backup() {
   const settings = { ...db.settings };
   delete settings.ai;
+  delete settings.lifelog;
   return { app: 'HypertroPhy', format: 1, exported: Date.now(), settings, routines: db.routines, workouts: db.workouts, profile: db.profile, chat: db.chat, body: db.body, plan: db.plan, plans: db.plans };
 }
 
@@ -116,7 +119,7 @@ export function restore(data) {
     weights: Array.isArray(b.weights) ? b.weights.filter(x => Number.isFinite(x?.t) && +x.w > 0).map(x => ({ t: x.t, w: +x.w, ...(x.src === 'hc' && { src: 'hc' }) })) : [],
   };
   db.chat = Array.isArray(data.chat) ? data.chat.filter(m => ['user', 'assistant'].includes(m?.role) && typeof m.content === 'string').map(m => ({ role: m.role, content: m.content })) : []; // no change cards: their undo data is outside input
-  db.settings = { units: data.settings.units, ai: db.settings.ai, lastBackup: data.exported };
+  db.settings = { units: data.settings.units, ai: db.settings.ai, lifelog: db.settings.lifelog, lastBackup: data.exported };
   db.active = null;
   save('settings', 'routines', 'workouts', 'profile', 'chat', 'active', 'body', 'plan', 'plans');
   return db.workouts.length;

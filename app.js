@@ -8,6 +8,7 @@ import * as coach from './coach.js';
 import * as ai from './ai.js';
 import * as watch from './watch.js';
 import { openScience } from './science.js';
+import * as lifelog from './lifelog.js';
 const { PRESETS, conn, models, chat } = ai;
 
 const img = (path, alt = '') => path ? `<img src="${photo(path)}" crossorigin="anonymous" loading="lazy" alt="${alt}">` : '';
@@ -147,7 +148,7 @@ ${PRESETS[ai.preset].home ? `<label>Home address<input data-ai="home" value="${e
     </div>
     <button class="pill wide" data-test>Test Connection</button>
     <p class="muted" id="aiMsg" role="status">The key is stored only on this phone.</p>
-
+${window.Capacitor?.isNativePlatform?.() ? lifelogSection() : ''}
     <h3 class="label">Why trust the AI</h3>
     <div class="group menu-list"><button data-science>The science behind your AI workouts</button></div>
 
@@ -159,10 +160,29 @@ ${PRESETS[ai.preset].home ? `<label>Home address<input data-ai="home" value="${e
     <p class="muted" id="backupMsg" role="status">Last backup: ${db.settings.lastBackup ? day(db.settings.lastBackup) : 'never'}. The file holds your workouts, routines and plan answers. AI keys stay on this phone.</p>
   </div>`;
 }
+// LifeLog (Android app only, see lifelog.js): addresses, token and the last send.
+function lifelogSection() {
+  const l = db.settings.lifelog || {}, inp = 'inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false"';
+  return `
+    <h3 class="label">LifeLog</h3>
+    <div class="group form-rows">
+      <label>Home address<input data-ll="home" value="${esc(l.home || '')}" placeholder="http://192.168.1.40:8000" ${inp}></label>
+      <label>Away address<input data-ll="url" value="${esc(l.url || '')}" placeholder="optional, Tailscale address" ${inp}></label>
+      <label>Token<input data-ll="token" type="password" value="${esc(l.token || '')}" autocomplete="off"></label>
+    </div>
+    <button class="pill wide" data-llsend>Send Now</button>
+    <p class="muted" id="llMsg" role="status">${l.error ? esc(l.error) : l.sentAt ? `Sent ${l.n} workout${l.n === 1 ? '' : 's'} · ${day(l.sentAt)}` : 'Sends your workouts to LifeLog after each change. The token is stored only on this phone.'}</p>
+`;
+}
 $('#settings').addEventListener('click', async ev => {
-  const b = ev.target.closest('[data-units], [data-preset], [data-test], [data-sex], [data-science]');
+  const b = ev.target.closest('[data-units], [data-preset], [data-test], [data-sex], [data-science], [data-llsend]');
   if (!b) return;
   if (b.dataset.science != null) return openScience();
+  if (b.dataset.llsend != null) {
+    b.disabled = true; $('#llMsg').textContent = 'Sending…';
+    await lifelog.send();
+    return renderSettings();
+  }
   if (b.dataset.units) { setUnits(b.dataset.units); return renderSettings(); }
   if (b.dataset.sex != null) { db.body.sex = b.dataset.sex; save('body'); return renderSettings(); }
   if (b.dataset.preset) { db.settings.ai.preset = b.dataset.preset; save('settings'); return renderSettings(); }
@@ -208,6 +228,7 @@ $('#settings').addEventListener('input', ev => {
     db.settings.plates = { bar: bar >= 0 ? bar : PLATE_DEFAULTS[db.settings.units].bar, have: [...document.querySelectorAll('[data-plate]:checked')].map(c => +c.value) };
     save('settings'); return;
   }
+  if (d.ll) { (db.settings.lifelog ||= {})[d.ll] = v; save('settings'); return; }
   const f = d.ai;
   if (f) { conn()[f] = ev.target.value.trim(); save('settings'); }
 });
@@ -286,3 +307,4 @@ async function checkUpdate() {
 }
 checkUpdate();
 document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && checkUpdate());
+if (native) lifelog.retry(); // a LifeLog send that failed last time
