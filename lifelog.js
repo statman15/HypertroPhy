@@ -38,6 +38,10 @@ export async function send() {
 let timer;
 onSave.push(keys => {
   if (!keys.includes('workouts') || !cfg().token) return;
+  // pending first, so a change is retried on the next open even if the app is closed before the send
+  // (written directly: save('settings') would come back through this hook)
+  cfg().pending = true;
+  localStorage.setItem('settings', JSON.stringify(db.settings));
   clearTimeout(timer);
   timer = setTimeout(send, 2000);
 });

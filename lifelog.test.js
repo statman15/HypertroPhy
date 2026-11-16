@@ -46,8 +46,10 @@ let sent = 0;
 globalThis.fetch = async () => { sent++; return { ok: true, status: 200 }; };
 save('settings');
 save('workouts');
+assert.equal(db.settings.lifelog.pending, true, 'marked pending at once, so closing the app before the send still retries');
 await new Promise(res => setTimeout(res, 2200));
 assert.equal(sent, 1, 'one send ~2 s after workouts change');
+assert.equal(db.settings.lifelog.pending, false);
 
 // the token never goes in a backup, and restoring keeps this phone's LifeLog setup
 const file = JSON.parse(JSON.stringify(backup()));
